@@ -9,6 +9,7 @@ wczytać z wypełnionego arkusza Excel.
 | Warstwa | Wybór | Dlaczego |
 |---|---|---|
 | Framework | Next.js 15 (App Router), TypeScript | Formularz i panel w jednym runtime; Server Actions zamiast osobnego API |
+| Hosting | **Cloudflare Workers** przez `@opennextjs/cloudflare` | |
 | Baza i auth | Supabase — projekt **BEAUTY** (`dhuvykwecsxgchzxufxw`) | Tabele `mienie_wnioski` / `mienie_lokalizacje` już tam były, razem z danymi |
 | Formularz | react-hook-form + zod | Jeden schemat waliduje formularz i import z Excela |
 | Excel | ExcelJS | Odczyt i zapis .xlsx po stronie serwera |
@@ -17,6 +18,26 @@ wczytać z wypełnionego arkusza Excel.
 Astro odpadło świadomie: aplikacja jest w całości interaktywna i server-side
 (kreator z autozapisem, parsowanie uploadu, panel z filtrami), więc wyspy Astro
 sprowadziłyby się do Next.js okrężną drogą.
+
+## Cloudflare Workers — co z tego wynika dla kodu
+
+Workers nie mają systemu plików w runtime, więc **szablonu .xlsx nie da się wczytać
+przez `fs`**. Źródłem prawdy pozostaje `public/szablon/wniosek-ubezpieczenie-majatkowe.xlsx`,
+a skrypt `scripts/generuj-szablon.ts` koduje go do `src/lib/excel/szablon.generated.ts`
+(base64, ~47 kB w bundlu). Generowanie jest wpięte **jawnie w każdą komendę build**,
+a nie w hook `prebuild` — `opennextjs-cloudflare build` woła `next build` bezpośrednio,
+z pominięciem hooków npm.
+
+Kod nie używa żadnych API Node'a: `node:crypto` zastąpiony Web Crypto, `Buffer`
+zastąpiony `Uint8Array`. Dzięki temu nic nie zależy od warstwy zgodności.
+
+ExcelJS **działa** w workerd — sprawdzone na zbudowanym workerze, nie założone.
+Biblioteka ciągnie `archiver`, `unzipper` i `tmp`, więc warto to potwierdzać ponownie
+przy większych aktualizacjach.
+
+Rozmiar workera: **9,8 MB surowo / 2,1 MB gzip** (`wrangler deploy --dry-run`).
+Limit darmowego planu to 3 MB gzip, płatnego 10 MB. Zapas jest, ale niewielki —
+przy dokładaniu ciężkich zależności warto zerknąć na ten wynik.
 
 ## Architektura
 
@@ -62,8 +83,25 @@ tokenem wniosku albo sesją agenta.
 ```bash
 npm install
 cp .env.example .env.local   # uzupełnij klucze z panelu Supabase (Settings → API)
-npm run dev
+npm run dev                  # Next dev, zwykły Node
 ```
+
+Podgląd na prawdziwym runtime Workers i wdrożenie:
+
+```bash
+npm run cf:preview   # build + wrangler dev na zbudowanym workerze
+npm run cf:deploy    # build + deploy
+```
+
+Sekrety na produkcji:
+
+```bash
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npx wrangler secret put NEXT_PUBLIC_SUPABASE_ANON_KEY
+```
+
+Zmienne `NEXT_PUBLIC_*` są wstrzykiwane podczas builda, więc muszą być dostępne
+także w środowisku budowania (Workers Builds → Variables), nie tylko w runtime.
 
 `SUPABASE_SERVICE_ROLE_KEY` pobierz z panelu Supabase. Nie może mieć prefiksu
 `NEXT_PUBLIC_` — z takim trafiłby do bundla przeglądarki.

@@ -1,5 +1,4 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "./supabase/admin";
 import { doWierszaWniosku, doWierszyLokalizacji, zWierszy } from "./mapowanie";
 import type { Wniosek } from "./schema";
@@ -9,7 +8,9 @@ import type { Wniosek } from "./schema";
  * (`<uuid>-ID<id firmy>`), zeby linki z CRM-u i z tej aplikacji wygladaly tak samo.
  */
 export function nowyToken(companyId: number | null): string {
-  return companyId ? `${randomUUID()}-ID${companyId}` : `${randomUUID()}-W${randomUUID().slice(0, 8)}`;
+  // Web Crypto zamiast `node:crypto` - dostepne i w Node, i w Cloudflare Workers.
+  const uuid = () => crypto.randomUUID();
+  return companyId ? `${uuid()}-ID${companyId}` : `${uuid()}-W${uuid().slice(0, 8)}`;
 }
 
 /** Ile dni link do wniosku pozostaje aktywny. */

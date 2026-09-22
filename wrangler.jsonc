@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pd-wniosek-majatkowy",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-22",
+  // Wymagane przez ExcelJS (node:stream, node:zlib, node:buffer).
+  // Od daty zgodnosci 2026-08-04 flaga jest domyslna, ale zostawiamy ja jawnie,
+  // zeby cofniecie compatibility_date nie wylaczylo po cichu obslugi Node.
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

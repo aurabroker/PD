@@ -26,7 +26,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
     nrReferencyjny: wynik.meta.nr_referencyjny,
   });
 
-  return new NextResponse(new Uint8Array(plik), {
+  return new NextResponse(plik, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="${nazwaPliku(

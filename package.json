@@ -3,19 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "szablon": "tsx scripts/generuj-szablon.ts",
+    "dev": "tsx scripts/generuj-szablon.ts && next dev",
+    "build": "tsx scripts/generuj-szablon.ts && next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsx scripts/generuj-szablon.ts && tsc --noEmit",
+    "cf:build": "tsx scripts/generuj-szablon.ts && opennextjs-cloudflare build",
+    "cf:preview": "tsx scripts/generuj-szablon.ts && opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "tsx scripts/generuj-szablon.ts && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
+    "@opennextjs/cloudflare": "^1.20.6",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
     "dotenv": "^18.0.2",
     "exceljs": "^4.4.0",
-    "next": "15.1.6",
+    "next": "^15.5.25",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-hook-form": "^7.54.2",
@@ -30,6 +36,7 @@
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "wrangler": "^4.136.1"
   }
 }

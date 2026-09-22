@@ -1,9 +1,8 @@
 import "server-only";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import ExcelJS from "exceljs";
 import type { Wniosek } from "../schema";
 import { sumaLokalizacji } from "../schema";
+import { SZABLON_XLSX_BASE64 } from "./szablon.generated";
 
 /**
  * Eksport wniosku do .xlsx.
@@ -13,7 +12,17 @@ import { sumaLokalizacji } from "../schema";
  * ktore klient i agent juz znaja, i da sie go ponownie zaimportowac.
  */
 
-const SZABLON = path.join(process.cwd(), "public", "szablon", "wniosek-ubezpieczenie-majatkowe.xlsx");
+/**
+ * Szablon jest wbudowany w bundle, a nie czytany z dysku: Cloudflare Workers
+ * nie maja systemu plikow w runtime. Modul `szablon.generated.ts` powstaje
+ * z pliku .xlsx w `public/szablon/` (skrypt `prebuild`).
+ */
+function wczytajSzablon(): ArrayBuffer {
+  const binarnie = atob(SZABLON_XLSX_BASE64);
+  const bajty = new Uint8Array(binarnie.length);
+  for (let i = 0; i < binarnie.length; i++) bajty[i] = binarnie.charCodeAt(i);
+  return bajty.buffer;
+}
 
 function norm(v: unknown): string {
   return String(v ?? "")
@@ -104,12 +113,11 @@ function pojemnoscTabeli(ws: ExcelJS.Worksheet, nrNaglowka: number): number {
 export async function zbudujExcelWniosku(
   dane: Wniosek,
   meta: { nrReferencyjny: string },
-): Promise<Buffer> {
+// Uint8Array<ArrayBuffer>, a nie samo Uint8Array: tylko ten wariant jest
+// akceptowany jako BodyInit przy budowaniu Response.
+): Promise<Uint8Array<ArrayBuffer>> {
   const skoroszyt = new ExcelJS.Workbook();
-  // ExcelJS niesie wlasna, starsza deklaracje Buffera niz @types/node w tym projekcie.
-  // Bierzemy typ wprost z sygnatury `load`, zeby nie zgadywac, ktory wariant jest w scope.
-  type BuforExcelJs = Parameters<typeof skoroszyt.xlsx.load>[0];
-  await skoroszyt.xlsx.load((await readFile(SZABLON)) as unknown as BuforExcelJs);
+  await skoroszyt.xlsx.load(wczytajSzablon());
 
   const arkusz = (fragment: string) =>
     skoroszyt.worksheets.find((ws) => norm(ws.name).includes(norm(fragment)));
@@ -295,7 +303,7 @@ export async function zbudujExcelWniosku(
   }
 
   const bufor = await skoroszyt.xlsx.writeBuffer();
-  return Buffer.from(bufor);
+  return new Uint8Array(bufor as ArrayBuffer);
 }
 
 /** Nazwa pliku do pobrania - bez znakow, ktore psuja naglowek Content-Disposition. */
