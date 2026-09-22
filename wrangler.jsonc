@@ -7,13 +7,11 @@
   // Od daty zgodnosci 2026-08-04 flaga jest domyslna, ale zostawiamy ja jawnie,
   // zeby cofniecie compatibility_date nie wylaczylo po cichu obslugi Node.
   "compatibility_flags": ["nodejs_compat"],
-  // Deploy ma sie NIE UDAC, jesli tego sekretu brakuje na Workerze.
-  // Bez tego brak klucza wychodzi dopiero w runtime, jako blad przy pierwszym
-  // zapisie. Uwaga: zwykla zmienna (tekst jawny) ustawiona w panelu jest
-  // nadpisywana przy kazdym `wrangler deploy` - sekrety przetrwaja deploy.
-  "secrets": {
-    "required": ["SUPABASE_SERVICE_ROLE_KEY"]
-  },
+  // Uwaga: NIE deklarujemy tu `secrets.required`. Walidacja wranglera sprawdza
+  // bindings deploymentu, a sekret trafia do bindings wylacznie przez
+  // `--secrets-file` albo `--var`. Przy komendzie `npx wrangler deploy`
+  // deklaracja blokowalaby kazdy deploy, nie dajac sie spelnic.
+  // Brak klucza wykrywa /api/stan i granice bledu w aplikacji.
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
