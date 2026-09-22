@@ -94,6 +94,21 @@ npm run cf:preview   # build + wrangler dev na zbudowanym workerze
 npm run cf:deploy    # build + deploy
 ```
 
+### Diagnostyka wdrożenia
+
+`GET /api/stan` mówi, co jest nie tak, bez ujawniania wartości kluczy:
+
+```json
+{"ok":false,"etap":"zmienne srodowiskowe","brakujace":["SUPABASE_SERVICE_ROLE_KEY"]}
+```
+
+Zwraca 200 gdy wszystko działa (z liczbą wniosków w bazie), 503 przy braku
+zmiennych albo problemie z połączeniem. Bez tego każdy błąd konfiguracji
+wygląda w panelu Cloudflare identycznie — jako gołe 500 bez treści.
+
+Nazwa Workera w `wrangler.jsonc` (`mienie-wnioski`) **musi się zgadzać**
+z nazwą Workera w panelu Cloudflare, inaczej deploy z Git builda padnie.
+
 Sekrety na produkcji:
 
 ```bash

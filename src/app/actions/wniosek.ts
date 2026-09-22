@@ -25,10 +25,31 @@ function bledyPol(issues: { path: (string | number)[]; message: string }[]) {
   return mapa;
 }
 
-/** Utworzenie pustego wniosku i przejscie do formularza. */
-export async function akcjaNowyWniosek() {
-  const utworzony = await utworzWniosek(pustyWniosek(), { zrodlo: "web" });
-  redirect(`/wniosek/${utworzony.form_token}`);
+/**
+ * Utworzenie pustego wniosku i przejscie do formularza.
+ *
+ * Blad zwracamy zamiast go rzucac: nieobsluzony wyjatek w Server Action
+ * daje uzytkownikowi gole 500 bez zadnej wskazowki, co sie stalo.
+ * `redirect()` musi zostac POZA blokiem try - dziala przez rzucenie
+ * NEXT_REDIRECT, ktory catch by polknal.
+ */
+export async function akcjaNowyWniosek(): Promise<WynikAkcji> {
+  let token: string;
+
+  try {
+    const utworzony = await utworzWniosek(pustyWniosek(), { zrodlo: "web" });
+    token = utworzony.form_token;
+  } catch (e) {
+    console.error("[akcjaNowyWniosek] nie udalo sie utworzyc wniosku:", e);
+    return {
+      ok: false,
+      blad:
+        "Nie udało się rozpocząć wniosku. Spróbuj ponownie za chwilę, " +
+        "a jeśli problem się powtarza — napisz do nas.",
+    };
+  }
+
+  redirect(`/wniosek/${token}`);
 }
 
 /** Zapis roboczy. Walidacja luzna - wniosek w trakcie wypelniania ma prawo byc niekompletny. */
@@ -105,6 +126,7 @@ export async function akcjaImportujExcel(formData: FormData): Promise<WynikImpor
     const utworzony = await utworzWniosek(dane, { zrodlo: "excel", nazwaPliku: plik.name });
     return { ok: true, token: utworzony.form_token, ostrzezenia };
   } catch (e) {
+    console.error("[akcjaImportujExcel] blad importu:", e);
     return {
       ok: false,
       blad:

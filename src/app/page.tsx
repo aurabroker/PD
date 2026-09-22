@@ -1,5 +1,5 @@
-import { akcjaNowyWniosek } from "./actions/wniosek";
 import FormularzImportu from "@/components/FormularzImportu";
+import PrzyciskNowyWniosek from "@/components/PrzyciskNowyWniosek";
 
 export default function StronaGlowna() {
   return (
@@ -20,11 +20,7 @@ export default function StronaGlowna() {
             Osiem kroków, sumy liczone automatycznie, zapis w trakcie wypełniania. Do wniosku możesz
             wrócić później — dostaniesz link.
           </p>
-          <form action={akcjaNowyWniosek} className="mt-6">
-            <button type="submit" className="przycisk-glowny w-full">
-              Rozpocznij wniosek
-            </button>
-          </form>
+          <PrzyciskNowyWniosek />
         </div>
 
         <div className="karta flex flex-col">
