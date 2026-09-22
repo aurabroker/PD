@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { stanKonfiguracji, supabaseAdmin } from "@/lib/supabase/admin";
+import { rolaKluczaSerwisowego, stanKonfiguracji, supabaseAdmin } from "@/lib/supabase/admin";
 import { WERSJA } from "@/lib/wersja.generated";
 
 export const runtime = "nodejs";
@@ -38,6 +38,24 @@ export async function GET() {
     );
   }
 
+  // Klucz jest ustawiony - sprawdzamy, czy to na pewno service_role.
+  const klucz = rolaKluczaSerwisowego();
+  if (!klucz.poprawna) {
+    return NextResponse.json(
+      {
+        ok: false,
+        wersja,
+        etap: "rodzaj klucza serwisowego",
+        zmienne,
+        klucz_serwisowy: { rozpoznana_rola: klucz.rozpoznana, uwaga: klucz.uwaga },
+        rada:
+          "W Supabase > Settings > API skopiuj klucz z sekcji service_role (albo Secret key) " +
+          "i wstaw go w Cloudflare jako SUPABASE_SERVICE_ROLE_KEY.",
+      },
+      { status: 503 },
+    );
+  }
+
   try {
     const { error, count } = await supabaseAdmin()
       .from("mienie_wnioski")
@@ -54,6 +72,7 @@ export async function GET() {
       ok: true,
       wersja,
       zmienne,
+      klucz_serwisowy: { rozpoznana_rola: klucz.rozpoznana },
       baza: { polaczenie: "OK", wnioskow: count ?? 0 },
     });
   } catch (e) {
