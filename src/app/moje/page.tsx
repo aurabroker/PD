@@ -32,9 +32,17 @@ export default function StronaMojeWnioski() {
     setBlad("");
 
     const supabase = supabasePrzegladarka();
+
+    // Adres powrotu musi byc na liscie Redirect URLs w Supabase (Authentication ->
+    // URL Configuration). Gdy go tam nie ma, Supabase po cichu podstawia Site URL
+    // projektu i klient laduje na zupelnie innej domenie.
+    const adresPowrotu = `${
+      process.env.NEXT_PUBLIC_ADRES_APLIKACJI || window.location.origin
+    }/auth/callback?nastepnie=/moje`;
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?nastepnie=/moje` },
+      options: { emailRedirectTo: adresPowrotu },
     });
 
     if (error) {

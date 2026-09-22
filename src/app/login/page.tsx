@@ -1,46 +1,48 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabasePrzegladarka } from "@/lib/supabase/client";
 
-/** Logowanie agenta. Magic link - bez hasel do zapamietywania i do wycieku. */
+/**
+ * Logowanie agenta: e-mail i haslo.
+ *
+ * Swiadomie bez magic linku - logowanie mailem wymaga przekierowania przez
+ * Supabase, a to zalezy od listy Redirect URLs w projekcie. Haslo dziala
+ * niezaleznie od domeny, pod ktora stoi aplikacja.
+ *
+ * Samo zalogowanie nie daje jeszcze dostepu do panelu: `biezacyAdmin()`
+ * dodatkowo sprawdza wpis w `katalog_admins`.
+ */
 export default function StronaLogowania() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
-  const [stan, setStan] = useState<"formularz" | "wysylam" | "wyslano">("formularz");
+  const [haslo, setHaslo] = useState("");
+  const [oczekuje, setOczekuje] = useState(false);
   const [blad, setBlad] = useState("");
 
   async function zaloguj(e: React.FormEvent) {
     e.preventDefault();
-    setStan("wysylam");
+    setOczekuje(true);
     setBlad("");
 
     const supabase = supabasePrzegladarka();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?nastepnie=/admin` },
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password: haslo });
 
     if (error) {
-      setBlad(error.message);
-      setStan("formularz");
+      // Komunikaty Supabase sa po angielsku - tlumaczymy te, ktore realnie wystepuja.
+      const komunikaty: Record<string, string> = {
+        "Invalid login credentials": "Nieprawidłowy e-mail lub hasło.",
+        "Email not confirmed": "Adres e-mail nie został jeszcze potwierdzony.",
+      };
+      setBlad(komunikaty[error.message] ?? error.message);
+      setOczekuje(false);
       return;
     }
 
-    setStan("wyslano");
-  }
-
-  if (stan === "wyslano") {
-    return (
-      <main className="mx-auto max-w-md px-4 py-16">
-        <div className="karta">
-          <h1 className="text-xl font-semibold">Sprawdź skrzynkę</h1>
-          <p className="mt-3 text-sm text-stone-600">
-            Wysłaliśmy link do logowania na adres <strong>{email}</strong>. Link jest jednorazowy
-            i ważny przez godzinę.
-          </p>
-        </div>
-      </main>
-    );
+    // refresh() wymusza ponowne wykonanie server componentow ze swiezym ciasteczkiem sesji.
+    router.push("/admin");
+    router.refresh();
   }
 
   return (
@@ -48,29 +50,51 @@ export default function StronaLogowania() {
       <form onSubmit={zaloguj} className="karta">
         <h1 className="text-xl font-semibold">Panel agenta</h1>
         <p className="mt-2 text-sm text-stone-600">
-          Podaj swój służbowy adres e-mail — wyślemy link do logowania.
+          Zaloguj się służbowym adresem e-mail i hasłem.
         </p>
 
-        <div className="mt-6">
-          <label htmlFor="email" className="etykieta">
-            Adres e-mail
-          </label>
-          <input
-            id="email"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="pole"
-          />
+        <div className="mt-6 space-y-4">
+          <div>
+            <label htmlFor="email" className="etykieta">
+              Adres e-mail
+            </label>
+            <input
+              id="email"
+              type="email"
+              required
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="pole"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="haslo" className="etykieta">
+              Hasło
+            </label>
+            <input
+              id="haslo"
+              type="password"
+              required
+              autoComplete="current-password"
+              value={haslo}
+              onChange={(e) => setHaslo(e.target.value)}
+              className="pole"
+            />
+          </div>
         </div>
 
-        {blad && <p className="komunikat-bledu">{blad}</p>}
+        {blad && <p className="komunikat-bledu mt-3">{blad}</p>}
 
-        <button type="submit" disabled={stan === "wysylam"} className="przycisk-glowny mt-5 w-full">
-          {stan === "wysylam" ? "Wysyłam…" : "Wyślij link do logowania"}
+        <button type="submit" disabled={oczekuje} className="przycisk-glowny mt-5 w-full">
+          {oczekuje ? "Loguję…" : "Zaloguj się"}
         </button>
+
+        <p className="mt-4 text-xs text-stone-500">
+          Hasło nadaje administrator w panelu Supabase. Jeśli go nie pamiętasz — zgłoś się po
+          zresetowanie.
+        </p>
       </form>
     </main>
   );

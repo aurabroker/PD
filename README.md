@@ -70,10 +70,27 @@ ostrzeżenia (wartości spoza słownika, sprzeczne pola) i czeka na potwierdzeni
 
 ### Dostęp
 
+- **Agent** — e-mail i hasło na `/login`, plus wpis w tabeli `katalog_admins`.
+  Samo zalogowanie nie wystarcza: `biezacyAdmin()` sprawdza obie rzeczy.
+  Świadomie bez magic linku — logowanie mailem zależy od listy Redirect URLs
+  w Supabase, a hasło działa niezależnie od domeny, pod którą stoi aplikacja.
 - **Klient** — link z `form_token`, ważny 60 dni; agent może przedłużyć w panelu.
   Do listy swoich wniosków klient loguje się magic linkiem na `/moje`, bez zakładania konta.
-- **Agent** — magic link na `/login`, plus wpis w tabeli `katalog_admins`.
-  Samo zalogowanie nie wystarcza: `biezacyAdmin()` sprawdza obie rzeczy.
+
+### Magic link klienta wymaga konfiguracji w Supabase
+
+To jedyne miejsce, gdzie aplikacja zależy od ustawień Auth. W Supabase →
+**Authentication → URL Configuration → Redirect URLs** musi być dopisany
+dokładny adres:
+
+```
+https://<domena-aplikacji>/auth/callback
+```
+
+Gdy go tam nie ma, Supabase **nie zgłasza błędu** — po cichu podstawia
+**Site URL** projektu i klient po kliknięciu w link ląduje na zupełnie innej
+domenie. Adres powrotu można wymusić zmienną `NEXT_PUBLIC_ADRES_APLIKACJI`;
+puste pole oznacza „użyj bieżącego origin".
 
 Dostęp do danych idzie przez Server Actions z kluczem `service_role`, który omija RLS.
 Klucz nigdy nie trafia do przeglądarki. Każda akcja sama weryfikuje uprawnienie —
@@ -122,12 +139,16 @@ także w środowisku budowania (Workers Builds → Variables), nie tylko w runti
 `SUPABASE_SERVICE_ROLE_KEY` pobierz z panelu Supabase. Nie może mieć prefiksu
 `NEXT_PUBLIC_` — z takim trafiłby do bundla przeglądarki.
 
-Konto agenta: zaloguj się przez `/login`, potem dodaj swój `user_id` do `katalog_admins`:
+Konto agenta zakłada administrator w Supabase → **Authentication → Users → Add user**
+(e-mail + hasło, zaznacz „Auto Confirm User"). Następnie nadaj mu dostęp do panelu:
 
 ```sql
 insert into public.katalog_admins (user_id)
 select id from auth.users where email = 'adres@aura-expert.pl';
 ```
+
+Bez tego wpisu poprawnie zalogowany użytkownik i tak zostanie odrzucony przez
+`/admin` — tak działa `biezacyAdmin()` i tak samo zachowują się polityki RLS.
 
 ## Testy
 
