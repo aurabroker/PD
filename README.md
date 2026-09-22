@@ -154,6 +154,18 @@ Dlatego `wrangler.jsonc` deklaruje `secrets.required` — deploy bez tego sekret
 kończy się błędem, zamiast wypuszczać na produkcję Workera, który wywróci się
 przy pierwszym zapisie.
 
+**Dwie drogi ustawienia sekretu, obie działają:**
+
+1. Na Workerze — Settings → Variables and Secrets → Add → typ **Secret**.
+   Działa od razu, bez przebudowy, i przetrwa każdy deploy.
+2. W środowisku builda — Workers Builds → Settings → Build → Build variables
+   and secrets, typ **Secret**. `wrangler deploy` czyta `process.env` i wgrywa
+   znalezione sekrety na Workera (w logu: `Using secrets defined in process.env`).
+   Wygodniejsze w CI, bo nie wymaga dostępu do lokalnej maszyny.
+
+Czego **nie** robić: ustawiać go jako zwykłą *Variable* na Workerze — zniknie
+przy najbliższym deployu.
+
 Stan zmiennych na żywym Workerze sprawdzisz bez wchodzenia w panel:
 
 ```bash
