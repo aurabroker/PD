@@ -12,3 +12,4 @@ next-env.d.ts
 .wrangler/
 cloudflare-env.d.ts
 src/lib/excel/szablon.generated.ts
+src/lib/wersja.generated.ts

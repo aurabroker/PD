@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { stanKonfiguracji, supabaseAdmin } from "@/lib/supabase/admin";
+import { WERSJA } from "@/lib/wersja.generated";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,9 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   const zmienne = stanKonfiguracji();
+  // Wersja na poczatku kazdej odpowiedzi: pozwala od razu stwierdzic,
+  // czy wdrozony jest kod, o ktorym mowa.
+  const wersja = WERSJA;
   const brakujace = Object.entries(zmienne)
     .filter(([, ustawione]) => !ustawione)
     .map(([nazwa]) => nazwa);
@@ -21,6 +25,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: false,
+        wersja,
         etap: "zmienne srodowiskowe",
         zmienne,
         brakujace,
@@ -40,19 +45,20 @@ export async function GET() {
 
     if (error) {
       return NextResponse.json(
-        { ok: false, etap: "polaczenie z baza", zmienne, blad: error.message },
+        { ok: false, wersja, etap: "polaczenie z baza", zmienne, blad: error.message },
         { status: 503 },
       );
     }
 
     return NextResponse.json({
       ok: true,
+      wersja,
       zmienne,
       baza: { polaczenie: "OK", wnioskow: count ?? 0 },
     });
   } catch (e) {
     return NextResponse.json(
-      { ok: false, etap: "polaczenie z baza", zmienne, blad: (e as Error)?.message },
+      { ok: false, wersja, etap: "polaczenie z baza", zmienne, blad: (e as Error)?.message },
       { status: 503 },
     );
   }

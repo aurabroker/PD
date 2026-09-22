@@ -7,6 +7,7 @@
  *
  * Uruchamiane automatycznie przed kazdym buildem (skrypt `prebuild`).
  */
+import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -28,3 +29,33 @@ export const SZABLON_ROZMIAR_BAJTOW = ${plik.length};
 
 writeFileSync(cel, modul);
 console.log(`Wygenerowano ${path.relative(process.cwd(), cel)} — ${plik.length} B -> ${modul.length} B`);
+
+// --- Znacznik wersji ---
+//
+// Identyfikator wersji Workera w panelu Cloudflare nie mowi nic o tym, ktory
+// commit jest wdrozony. Bez tego znacznika kazde pytanie "czy poprawka juz
+// dziala" konczy sie zgadywaniem. /api/stan raportuje te wartosci.
+
+function commit(): string {
+  // Workers Builds wstrzykuje SHA samo; przy deployu z CLI bierzemy je z gita.
+  const zCi = process.env.WORKERS_CI_COMMIT_SHA;
+  if (zCi) return zCi.slice(0, 7);
+  try {
+    return execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
+  } catch {
+    return "nieznany";
+  }
+}
+
+const celWersji = path.join(process.cwd(), "src", "lib", "wersja.generated.ts");
+const znacznik = `// PLIK GENEROWANY - nie edytuj. Zrodlo: scripts/generuj-szablon.ts
+
+export const WERSJA = {
+  commit: "${commit()}",
+  galaz: "${process.env.WORKERS_CI_BRANCH ?? ""}",
+  zbudowano: "${new Date().toISOString()}",
+} as const;
+`;
+
+writeFileSync(celWersji, znacznik);
+console.log(`Znacznik wersji: commit ${commit()}`);

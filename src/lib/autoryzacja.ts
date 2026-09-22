@@ -7,20 +7,38 @@ import { supabaseServer } from "./supabase/server";
  * Kazda strona i akcja panelu musi przejsc przez te funkcje.
  */
 export async function biezacyAdmin() {
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Kazdy wyjatek tutaj przewraca cale /admin z nieczytelnym 500, bo funkcja
+  // jest wolana w layoucie. Traktujemy blad jak brak uprawnien (przekierowanie
+  // na logowanie) i zostawiamy slad w logach.
+  try {
+    const supabase = await supabaseServer();
+    const {
+      data: { user },
+      error: bladSesji,
+    } = await supabase.auth.getUser();
 
-  if (!user) return null;
+    if (bladSesji) {
+      console.error("[biezacyAdmin] blad odczytu sesji:", bladSesji.message);
+      return null;
+    }
+    if (!user) return null;
 
-  const { data } = await supabaseAdmin()
-    .from("katalog_admins")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+    const { data, error } = await supabaseAdmin()
+      .from("katalog_admins")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-  return data ? user : null;
+    if (error) {
+      console.error("[biezacyAdmin] blad odczytu katalog_admins:", error.message);
+      return null;
+    }
+
+    return data ? user : null;
+  } catch (e) {
+    console.error("[biezacyAdmin] wyjatek:", e instanceof Error ? e.message : e);
+    return null;
+  }
 }
 
 /**

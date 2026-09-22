@@ -32,7 +32,18 @@ export default async function ListaWnioskow({
     );
   }
 
-  const { data: wnioski, error } = await zapytanie;
+  // Wyjatek (np. zerwane polaczenie) zamieniamy na komunikat na stronie -
+  // inaczej panel pokazuje gole 500 bez wskazowki, co sie stalo.
+  let wnioski: Awaited<typeof zapytanie>["data"] = null;
+  let error: { message: string } | null = null;
+  try {
+    const wynik = await zapytanie;
+    wnioski = wynik.data;
+    error = wynik.error;
+  } catch (e) {
+    console.error("[admin/lista] wyjatek zapytania:", e);
+    error = { message: e instanceof Error ? e.message : "Nie udało się pobrać wniosków." };
+  }
 
   const lacznie = (wnioski ?? []).reduce((acc, w) => acc + (Number(w.suma_lacznie) || 0), 0);
 
