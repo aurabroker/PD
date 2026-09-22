@@ -130,11 +130,36 @@ Sekrety na produkcji:
 
 ```bash
 npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-npx wrangler secret put NEXT_PUBLIC_SUPABASE_ANON_KEY
 ```
 
-Zmienne `NEXT_PUBLIC_*` są wstrzykiwane podczas builda, więc muszą być dostępne
-także w środowisku budowania (Workers Builds → Variables), nie tylko w runtime.
+### Trzy różne miejsca na zmienne — łatwo pomylić
+
+| Gdzie | Kiedy istnieje | Co tu wstawić |
+|---|---|---|
+| Workers Builds → **Build variables** | tylko podczas kompilacji | `NEXT_PUBLIC_*` |
+| Worker → **Variables and Secrets**, typ *Variable* | w runtime, ale **kasowane przy każdym `wrangler deploy`** | nic ważnego |
+| Worker → **Variables and Secrets**, typ *Secret* | w runtime, przetrwa deploy | `SUPABASE_SERVICE_ROLE_KEY` |
+
+Zmienne `NEXT_PUBLIC_*` Next wkompilowuje w bundle podczas builda, więc wystarczą
+w Build variables i **będą raportowane jako obecne nawet przy pustym runtime**.
+To mylące przy diagnozie: `NEXT_PUBLIC_*` mogą pokazywać `true`, podczas gdy Worker
+nie ma ani jednej zmiennej środowiskowej.
+
+Klucz serwisowy musi być **Secretem**. Ustawiony jako zwykła Variable zniknie przy
+najbliższym deployu — [dokumentacja Cloudflare](https://developers.cloudflare.com/workers/wrangler/configuration/#source-of-truth):
+*„If you change your environment variables in the Cloudflare dashboard, Wrangler will
+override them the next time you deploy. […] Wrangler will not delete your secrets."*
+
+Dlatego `wrangler.jsonc` deklaruje `secrets.required` — deploy bez tego sekretu
+kończy się błędem, zamiast wypuszczać na produkcję Workera, który wywróci się
+przy pierwszym zapisie.
+
+Stan zmiennych na żywym Workerze sprawdzisz bez wchodzenia w panel:
+
+```bash
+curl -s "https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/workers/scripts/mienie-wnioski/secrets" \
+  -H "Authorization: Bearer <TOKEN>"
+```
 
 `SUPABASE_SERVICE_ROLE_KEY` pobierz z panelu Supabase. Nie może mieć prefiksu
 `NEXT_PUBLIC_` — z takim trafiłby do bundla przeglądarki.
