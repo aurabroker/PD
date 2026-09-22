@@ -59,3 +59,28 @@ export const WERSJA = {
 
 writeFileSync(celWersji, znacznik);
 console.log(`Znacznik wersji: commit ${commit()}`);
+
+// --- Kontrola zmiennych buildowych ---
+//
+// Zmienne NEXT_PUBLIC_* Next wkompilowuje w bundle podczas builda. Gdy ich
+// brakuje, build przechodzi bez ostrzezenia, a aplikacja wywraca sie dopiero
+// u klienta - i wyglada to identycznie jak brak sekretu w runtime.
+// Sekret runtime pilnuje `secrets.required` w wrangler.jsonc; to jest jego
+// odpowiednik dla etapu kompilacji.
+
+const WYMAGANE_W_BUILDZIE = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"];
+const brakujace = WYMAGANE_W_BUILDZIE.filter((n) => !process.env[n]?.trim());
+
+if (brakujace.length > 0) {
+  const wCi = Boolean(process.env.CI || process.env.WORKERS_CI_COMMIT_SHA);
+  const opis =
+    `Brak zmiennych buildowych: ${brakujace.join(", ")}.\n` +
+    "Next wkompilowuje je w bundle, wiec musza byc dostepne podczas builda\n" +
+    "(Workers Builds -> Settings -> Build -> Build variables), a nie tylko w runtime.";
+
+  if (wCi) {
+    console.error(`\nBLAD: ${opis}\n`);
+    process.exit(1);
+  }
+  console.warn(`\nUWAGA: ${opis}\nLokalnie uzupelnij .env.local.\n`);
+}
