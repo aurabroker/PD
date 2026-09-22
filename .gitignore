@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+build/
+.env
+.env.local
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+.vercel
+.open-next/
+.wrangler/
+cloudflare-env.d.ts
+src/lib/excel/szablon.generated.ts
