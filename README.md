@@ -36,8 +36,9 @@ Biblioteka ciągnie `archiver`, `unzipper` i `tmp`, więc warto to potwierdzać 
 przy większych aktualizacjach.
 
 Rozmiar workera: **9,8 MB surowo / 2,1 MB gzip** (`wrangler deploy --dry-run`).
-Limit darmowego planu to 3 MB gzip, płatnego 10 MB. Zapas jest, ale niewielki —
-przy dokładaniu ciężkich zależności warto zerknąć na ten wynik.
+Projekt działa na płatnym planie Workers, gdzie limit wynosi 10 MB gzip —
+zapasu jest więc z nadmiarem. Warto mimo to zerkać na ten wynik przy
+dokładaniu ciężkich zależności, bo ExcelJS sam w sobie waży sporo.
 
 ## Architektura
 
@@ -124,12 +125,43 @@ NODE_OPTIONS='--conditions=react-server' npx tsx scripts/test-roundtrip.ts <plik
 
 ## Stan bazy
 
-Migracja `20260922_mienie_wnioski_workflow_columns.sql` jest **zastosowana**.
+Obie migracje są **zastosowane** na projekcie BEAUTY:
 
-`DO_ZATWIERDZENIA_20260922_rls_lockdown.sql` **czeka na decyzję**. Polityki RLS pozwalają
-dziś roli `anon` czytać i nadpisywać wszystkie wnioski — z NIP-ami, adresami i telefonami.
-Plik zamyka tę dziurę, ale najpierw trzeba ustalić, czy nie korzysta z niej wcześniejsza
-aplikacja, która zapisała dwa wnioski z czerwca 2026. Szczegóły w nagłówku pliku.
+- `20260922_mienie_wnioski_workflow_columns.sql` — kolumny obiegu wniosku
+- `20260922_mienie_rls_lockdown.sql` — zamknięcie dostępu roli `anon`
+
+### Model dostępu po lockdownie
+
+| Kto | Dostęp |
+|---|---|
+| `anon` (klucz publiczny) | **brak** — żadnej polityki |
+| `service_role` (Server Actions) | pełny, omija RLS; każda akcja sama sprawdza uprawnienie |
+| agent zalogowany | pełny, ale tylko przy wpisie w `katalog_admins` |
+| klient zalogowany magic linkiem | odczyt wyłącznie własnych wniosków (po e-mailu z tokenu) |
+| klient z linkiem, bez logowania | przez `service_role` po weryfikacji `form_token` |
+
+Zweryfikowane wykonaniem zapytań **w roli `anon`**, nie samym odczytem `pg_policies`:
+odczyt zwraca 0 z 2 wierszy, insert odrzucony przez RLS, update obejmuje 0 wierszy.
+Tabele zniknęły też z listy ostrzeżeń Supabase Advisors.
+
+Gdyby okazało się, że jakaś starsza aplikacja pisała kluczem `anon` i przestała działać,
+jest `20260922_mienie_rls_lockdown_ROLLBACK.sql` — ale przywraca on dziurę, więc nadaje się
+tylko na czas przepięcia tamtej aplikacji na `service_role`.
+
+### Znalezione przy okazji, poza zakresem tej aplikacji
+
+Supabase Advisors zgłasza dla projektu BEAUTY rzeczy niezwiązane z wnioskami majątkowymi,
+dotyczące modułu katalogu salonów. Nie ruszałem ich:
+
+- trzy widoki `public_catalog_*` / `public_salon_reviews` z `SECURITY DEFINER` (poziom ERROR)
+- `salon_search_index` — widok zmaterializowany czytelny dla `anon`
+- `tax_wnioski` — RLS włączone, zero polityk (czyli tabela zamknięta, nie otwarta)
+- rozszerzenia `citext`, `unaccent`, `pg_trgm` w schemacie `public`
+
+Funkcja `katalog_set_admin` też się tam pojawia, ale sprawdziłem jej treść — ma
+wewnętrzny `if not is_katalog_admin() then raise exception 'forbidden'`, więc nie da się
+przez nią nadać sobie uprawnień. To istotne, bo polityka admina dla wniosków opiera się
+właśnie na `katalog_admins`.
 
 ## Czego nie ma w szablonie Excel
 
