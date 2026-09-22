@@ -71,6 +71,28 @@ console.log(`Znacznik wersji: commit ${commit()}`);
 const WYMAGANE_W_BUILDZIE = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"];
 const brakujace = WYMAGANE_W_BUILDZIE.filter((n) => !process.env[n]?.trim());
 
+/**
+ * Wypis NAZW zmiennych dotyczacych Supabase - nigdy wartosci.
+ *
+ * Literowka w nazwie zmiennej jest praktycznie niewidoczna: panel pokazuje,
+ * ze zmienna istnieje, a build i runtime jej nie widza. To wypisanie pokazuje
+ * w logu builda, co faktycznie dotarlo, wiec rozbieznosc rzuca sie w oczy.
+ */
+const nazwySupabase = Object.keys(process.env)
+  .filter((n) => /supabase/i.test(n))
+  .sort();
+
+console.log(
+  `Zmienne Supabase widoczne w buildzie (same nazwy): ${
+    nazwySupabase.length ? nazwySupabase.join(", ") : "BRAK"
+  }`,
+);
+console.log(
+  `SUPABASE_SERVICE_ROLE_KEY w srodowisku builda: ${
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ? "jest" : "BRAK"
+  }`,
+);
+
 if (brakujace.length > 0) {
   const wCi = Boolean(process.env.CI || process.env.WORKERS_CI_COMMIT_SHA);
   const opis =
