@@ -11,8 +11,9 @@
     "typecheck": "tsx scripts/generuj-szablon.ts && tsc --noEmit",
     "cf:build": "tsx scripts/generuj-szablon.ts && opennextjs-cloudflare build",
     "cf:preview": "tsx scripts/generuj-szablon.ts && opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "tsx scripts/generuj-szablon.ts && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+    "cf:deploy": "tsx scripts/generuj-szablon.ts && opennextjs-cloudflare build && node scripts/sekrety-do-pliku.mjs && (opennextjs-cloudflare deploy -- --secrets-file .wrangler-sekrety.json; KOD=$?; node scripts/usun-plik-sekretow.mjs; exit $KOD)",
+    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "cf:deploy:ci": "node scripts/sekrety-do-pliku.mjs && (opennextjs-cloudflare deploy -- --secrets-file .wrangler-sekrety.json; KOD=$?; node scripts/usun-plik-sekretow.mjs; exit $KOD)"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

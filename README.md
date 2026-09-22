@@ -154,16 +154,26 @@ Dlatego `wrangler.jsonc` deklaruje `secrets.required` — deploy bez tego sekret
 kończy się błędem, zamiast wypuszczać na produkcję Workera, który wywróci się
 przy pierwszym zapisie.
 
-**Dwie drogi ustawienia sekretu, obie działają:**
+**Sekret runtime — dwie drogi, obie sprawdzone:**
 
-1. Na Workerze — Settings → Variables and Secrets → Add → typ **Secret**.
-   Działa od razu, bez przebudowy, i przetrwa każdy deploy.
-2. W środowisku builda — Workers Builds → Settings → Build → Build variables
-   and secrets, typ **Secret**. `wrangler deploy` czyta `process.env` i wgrywa
-   znalezione sekrety na Workera (w logu: `Using secrets defined in process.env`).
-   Wygodniejsze w CI, bo nie wymaga dostępu do lokalnej maszyny.
+1. **Przez Workers Builds** (nic nie trzeba robić poza ustawieniem zmiennej).
+   Ustaw `SUPABASE_SERVICE_ROLE_KEY` w Settings → Build → Build variables and
+   secrets, a **deploy command** ustaw na `npm run cf:deploy:ci`.
+   Ten skrypt zapisuje sekret do pliku tymczasowego i wywołuje
+   `wrangler deploy --secrets-file`, po czym plik kasuje.
+2. **Raz, bezpośrednio na Workerze:** `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY`
+   albo Settings → Variables and Secrets → Add → typ **Secret** → Deploy.
+   Wtedy zwykłe `npx wrangler deploy` wystarczy.
 
-Czego **nie** robić: ustawiać go jako zwykłą *Variable* na Workerze — zniknie
+**Czego nie robić i dlaczego:**
+
+`wrangler deploy` **nie wgrywa** sekretów z `process.env`. Komunikat
+`Using secrets defined in process.env` w logu dotyczy ładowania zmiennych,
+nie przesyłania sekretów — łatwo go błędnie odczytać. Sekret trafia na Workera
+wyłącznie przez `wrangler secret put` albo `--secrets-file`. Sama obecność
+zmiennej w środowisku builda nic nie daje.
+
+Nie ustawiaj go też jako zwykłej *Variable* na Workerze — zniknie
 przy najbliższym deployu.
 
 Stan zmiennych na żywym Workerze sprawdzisz bez wchodzenia w panel:
