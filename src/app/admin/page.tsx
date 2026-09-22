@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { STATUS, STATUS_ETYKIETY } from "@/lib/slowniki";
-import { zl } from "@/components/pola";
+import { zl } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 

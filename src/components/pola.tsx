@@ -157,6 +157,3 @@ export function Sekcja({
     </section>
   );
 }
-
-export const zl = (v: number) =>
-  new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(v || 0);

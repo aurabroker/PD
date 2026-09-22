@@ -14,7 +14,8 @@ import {
   ZAKRES,
   ZAKRES_SKLADOWE_OGNIA,
 } from "@/lib/slowniki";
-import { Pole, PoleKwota, PoleObszar, PoleTakNie, PoleWybor, Sekcja, zl } from "@/components/pola";
+import { Pole, PoleKwota, PoleObszar, PoleTakNie, PoleWybor, Sekcja } from "@/components/pola";
+import { zl } from "@/lib/format";
 import KrokLokalizacja from "./KrokLokalizacja";
 import { TabelaSzkod, WykazElektroniki, WykazSprzetuMedycznego } from "./KrokiPomocnicze";
 

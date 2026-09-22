@@ -2,7 +2,8 @@
 
 import { useFieldArray, useFormContext } from "react-hook-form";
 import type { Wniosek } from "@/lib/schema";
-import { Pole, PoleKwota, PoleTakNie, zl } from "@/components/pola";
+import { Pole, PoleKwota, PoleTakNie } from "@/components/pola";
+import { zl } from "@/lib/format";
 
 /** Wspolna tabela wykazu sprzetu - rozni sie tylko kolumnami. */
 function PrzyciskDodaj({ onClick, etykieta }: { onClick: () => void; etykieta: string }) {

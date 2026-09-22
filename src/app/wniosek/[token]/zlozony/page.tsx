@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { pobierzWniosek } from "@/lib/wnioski";
-import { zl } from "@/components/pola";
+import { zl } from "@/lib/format";
 import { sumaWniosku } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";

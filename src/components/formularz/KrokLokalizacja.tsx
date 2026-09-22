@@ -3,7 +3,8 @@
 import { useFormContext } from "react-hook-form";
 import type { Lokalizacja, Wniosek } from "@/lib/schema";
 import { sumaLokalizacji } from "@/lib/schema";
-import { Pole, PoleKwota, PoleTakNie, PoleWybor, zl } from "@/components/pola";
+import { Pole, PoleKwota, PoleTakNie, PoleWybor } from "@/components/pola";
+import { zl } from "@/lib/format";
 import {
   ALARM_TYP,
   MATERIAL_SCIAN,

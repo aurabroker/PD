@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { pobierzWniosekPoId } from "@/lib/wnioski";
 import { kontrolaSpojnosci, sumaLokalizacji, sumaWniosku } from "@/lib/schema";
-import { zl } from "@/components/pola";
+import { zl } from "@/lib/format";
 import { POZYCJE_SUM, STATUS_ETYKIETY } from "@/lib/slowniki";
 import PanelAgenta from "@/components/PanelAgenta";
 
