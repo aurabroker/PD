@@ -314,9 +314,36 @@ function KrokDaneFirmy() {
           <WeryfikacjaRegon
             pobierzNip={() => getValues("nip")}
             onZastosuj={(dane) => {
-              if (dane.nazwa) setValue("nazwa_firmy", dane.nazwa, { shouldDirty: true, shouldValidate: true });
-              if (dane.adres) setValue("adres_siedziby", dane.adres, { shouldDirty: true, shouldValidate: true });
-              if (dane.regon) setValue("regon", dane.regon, { shouldDirty: true });
+              const opcje = { shouldDirty: true, shouldValidate: true } as const;
+              const zrobione: string[] = [];
+              // Dane rejestrowe — oficjalne, nadpisujemy.
+              const urzedowe: [keyof Wniosek, string, string][] = [
+                ["nazwa_firmy", dane.nazwa, "nazwa"],
+                ["adres_siedziby", dane.adres, "adres"],
+                ["regon", dane.regon, "REGON"],
+                ["krs", dane.krs, "KRS"],
+                ["forma_prawna", dane.forma_prawna, "forma prawna"],
+                ["numer_pkd", dane.pkd_glowne?.kod ?? "", "PKD"],
+              ];
+              for (const [pole, wartosc, etykieta] of urzedowe) {
+                if (wartosc && getValues(pole) !== wartosc) {
+                  setValue(pole, wartosc as never, opcje);
+                  zrobione.push(etykieta);
+                }
+              }
+              // Kontakt i opis — tylko gdy klient jeszcze nic nie wpisał.
+              const uzupelniajace: [keyof Wniosek, string, string][] = [
+                ["email_kontaktowy", dane.email.toLowerCase(), "e-mail"],
+                ["telefon", dane.telefon, "telefon"],
+                ["rodzaj_dzialalnosci", dane.pkd_glowne?.nazwa ?? "", "rodzaj działalności"],
+              ];
+              for (const [pole, wartosc, etykieta] of uzupelniajace) {
+                if (wartosc && !String(getValues(pole) ?? "").trim()) {
+                  setValue(pole, wartosc as never, opcje);
+                  zrobione.push(etykieta);
+                }
+              }
+              return zrobione;
             }}
           />
           <Pole etykieta="REGON" rejestracja={register("regon")} />
