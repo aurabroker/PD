@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { akcjaMojeWnioski } from "@/app/actions/wniosek";
 import { supabasePrzegladarka } from "@/lib/supabase/client";
 import { STATUS_ETYKIETY } from "@/lib/slowniki";
+import Turnstile from "@/components/Turnstile";
+import { TURNSTILE_WLACZONY } from "@/lib/turnstile-config";
 
 type Pozycja = Awaited<ReturnType<typeof akcjaMojeWnioski>>[number];
 
@@ -13,6 +15,9 @@ export default function StronaMojeWnioski() {
   const [stan, setStan] = useState<"sprawdzam" | "formularz" | "wyslano" | "lista">("sprawdzam");
   const [wnioski, setWnioski] = useState<Pozycja[]>([]);
   const [blad, setBlad] = useState("");
+  const [token, setToken] = useState("");
+  const [resetKey, setResetKey] = useState(0);
+  const onToken = useCallback((t: string) => setToken(t), []);
 
   useEffect(() => {
     const supabase = supabasePrzegladarka();
@@ -42,10 +47,13 @@ export default function StronaMojeWnioski() {
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: adresPowrotu },
+      options: { emailRedirectTo: adresPowrotu, ...(token ? { captchaToken: token } : {}) },
     });
 
     if (error) {
+      // Token Turnstile jest jednorazowy — po bledzie odswiezamy widget.
+      setToken("");
+      setResetKey((k) => k + 1);
       setBlad(error.message);
       return;
     }
@@ -82,8 +90,15 @@ export default function StronaMojeWnioski() {
             <input id="email" type="email" required value={email}
               onChange={(e) => setEmail(e.target.value)} className="pole" />
           </div>
+          <Turnstile key={resetKey} onToken={onToken} />
           {blad && <p className="komunikat-bledu">{blad}</p>}
-          <button type="submit" className="przycisk-glowny mt-5 w-full">Wyślij link</button>
+          <button
+            type="submit"
+            disabled={TURNSTILE_WLACZONY && !token}
+            className="przycisk-glowny mt-5 w-full"
+          >
+            Wyślij link
+          </button>
         </form>
       </main>
     );

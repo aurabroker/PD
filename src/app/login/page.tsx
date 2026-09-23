@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabasePrzegladarka } from "@/lib/supabase/client";
+import Turnstile from "@/components/Turnstile";
+import { TURNSTILE_WLACZONY } from "@/lib/turnstile-config";
 
 /**
  * Logowanie agenta: e-mail i haslo.
@@ -20,6 +22,11 @@ export default function StronaLogowania() {
   const [haslo, setHaslo] = useState("");
   const [oczekuje, setOczekuje] = useState(false);
   const [blad, setBlad] = useState("");
+  const [token, setToken] = useState("");
+  const [resetKey, setResetKey] = useState(0);
+  const onToken = useCallback((t: string) => setToken(t), []);
+
+  const gotowe = !TURNSTILE_WLACZONY || Boolean(token);
 
   async function zaloguj(e: React.FormEvent) {
     e.preventDefault();
@@ -27,9 +34,16 @@ export default function StronaLogowania() {
     setBlad("");
 
     const supabase = supabasePrzegladarka();
-    const { error } = await supabase.auth.signInWithPassword({ email, password: haslo });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password: haslo,
+      options: token ? { captchaToken: token } : undefined,
+    });
 
     if (error) {
+      // Token Turnstile jest jednorazowy — po nieudanej probie odswiezamy widget.
+      setToken("");
+      setResetKey((k) => k + 1);
       // Komunikaty Supabase sa po angielsku - tlumaczymy te, ktore realnie wystepuja.
       const komunikaty: Record<string, string> = {
         "Invalid login credentials": "Nieprawidłowy e-mail lub hasło.",
@@ -85,9 +99,11 @@ export default function StronaLogowania() {
           </div>
         </div>
 
+        <Turnstile key={resetKey} onToken={onToken} />
+
         {blad && <p className="komunikat-bledu mt-3">{blad}</p>}
 
-        <button type="submit" disabled={oczekuje} className="przycisk-glowny mt-5 w-full">
+        <button type="submit" disabled={oczekuje || !gotowe} className="przycisk-glowny mt-5 w-full">
           {oczekuje ? "Loguję…" : "Zaloguj się"}
         </button>
 

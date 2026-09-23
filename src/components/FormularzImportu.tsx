@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { akcjaImportujExcel } from "@/app/actions/wniosek";
+import Turnstile from "@/components/Turnstile";
+import { TURNSTILE_WLACZONY } from "@/lib/turnstile-config";
 import type { OstrzezenieImportu } from "@/lib/excel/parse";
 
 export default function FormularzImportu() {
@@ -11,10 +13,16 @@ export default function FormularzImportu() {
   const [blad, setBlad] = useState("");
   const [ostrzezenia, setOstrzezenia] = useState<OstrzezenieImportu[] | null>(null);
   const [token, setToken] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const onTurnstile = useCallback((t: string) => setTurnstileToken(t), []);
+
+  const gotowe = !TURNSTILE_WLACZONY || Boolean(turnstileToken);
 
   function wyslij(formData: FormData) {
     setBlad("");
     setOstrzezenia(null);
+
+    formData.set("turnstile", turnstileToken);
 
     // Kontrola po stronie klienta — zanim plik poleci na serwer. Serwerowy
     // limit ciala akcji to ~1 MB, wiec wiekszy plik i tak by sie wysypal.
@@ -93,8 +101,9 @@ export default function FormularzImportu() {
                    file:px-4 file:py-2 file:text-sm file:font-medium file:text-marka-900
                    hover:file:bg-marka-200"
       />
+      <Turnstile onToken={onTurnstile} />
       {blad && <p className="text-xs text-red-600">{blad}</p>}
-      <button type="submit" disabled={oczekuje} className="przycisk-drugi w-full">
+      <button type="submit" disabled={oczekuje || !gotowe} className="przycisk-drugi w-full">
         {oczekuje ? "Wczytuję…" : "Wczytaj wniosek z pliku"}
       </button>
     </form>

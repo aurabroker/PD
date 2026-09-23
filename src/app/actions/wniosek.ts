@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { biezacyAdmin } from "@/lib/autoryzacja";
+import { zweryfikujTurnstile } from "@/lib/turnstile";
 import { sprawdzPlikXlsx, BladPliku } from "@/lib/excel/bezpieczenstwo";
 import { wczytajWniosekZExcela } from "@/lib/excel/parse";
 import type { OstrzezenieImportu } from "@/lib/excel/parse";
@@ -14,6 +16,12 @@ import { STATUS } from "@/lib/slowniki";
 export type WynikAkcji =
   | { ok: true; komunikat?: string }
   | { ok: false; blad: string; bledyPol?: Record<string, string> };
+
+/** Adres IP klienta z naglowkow Cloudflare — przekazywany do weryfikacji Turnstile. */
+async function ipKlienta(): Promise<string | null> {
+  const h = await headers();
+  return h.get("cf-connecting-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+}
 
 /** Bledy walidacji zod -> mapa "sciezka pola" => komunikat, czytana przez formularz. */
 function bledyPol(issues: { path: (string | number)[]; message: string }[]) {
@@ -33,7 +41,11 @@ function bledyPol(issues: { path: (string | number)[]; message: string }[]) {
  * `redirect()` musi zostac POZA blokiem try - dziala przez rzucenie
  * NEXT_REDIRECT, ktory catch by polknal.
  */
-export async function akcjaNowyWniosek(): Promise<WynikAkcji> {
+export async function akcjaNowyWniosek(turnstileToken?: string): Promise<WynikAkcji> {
+  if (!(await zweryfikujTurnstile(turnstileToken, await ipKlienta()))) {
+    return { ok: false, blad: "Potwierdź, że nie jesteś robotem, i spróbuj ponownie." };
+  }
+
   let token: string;
 
   try {
@@ -108,6 +120,10 @@ export type WynikImportuAkcji =
  * klient zawsze oglada i potwierdza wczytane dane, nic nie jest skladane automatycznie.
  */
 export async function akcjaImportujExcel(formData: FormData): Promise<WynikImportuAkcji> {
+  if (!(await zweryfikujTurnstile(formData.get("turnstile")?.toString(), await ipKlienta()))) {
+    return { ok: false, blad: "Potwierdź, że nie jesteś robotem, i spróbuj ponownie." };
+  }
+
   const plik = formData.get("plik");
 
   if (!(plik instanceof File) || plik.size === 0) {
