@@ -50,7 +50,7 @@ create table public.mienie_wnioski (
     check (status in ('roboczy','zlozony','w_ocenie','wyceniony','zaakceptowany','odrzucony','archiwalny')),
   zrodlo text not null default 'web' check (zrodlo in ('web','excel','agent')),
   wyslano_at timestamptz, miejscowosc_podpisu text default '', data_podpisu date,
-  uwagi_agenta text default '', import_plik text, token_wygasa timestamptz
+  uwagi_agenta text default '', import_plik text, import_zgodnosc jsonb, token_wygasa timestamptz
 );
 create index idx_mienie_wnioski_company_id on public.mienie_wnioski (company_id);
 create index idx_mienie_wnioski_form_token on public.mienie_wnioski (form_token);

@@ -17,7 +17,16 @@ import { SZABLON_XLSX_BASE64 } from "./szablon.generated";
  * nie maja systemu plikow w runtime. Modul `szablon.generated.ts` powstaje
  * z pliku .xlsx w `public/szablon/` (skrypt `prebuild`).
  */
-function wczytajSzablon(): ArrayBuffer {
+/**
+ * Naglowek, ktory eksport wpisuje w miejsce podtytulu na zakladce „1. Dane firmy”.
+ * Kontrola zgodnosci z szablonem (zgodnosc.ts) akceptuje go przez ten wzor —
+ * zmiana tekstu tutaj wymaga zmiany wzoru.
+ */
+export const NAGLOWEK_EKSPORTU = { arkusz: "1. Dane firmy", adres: "B3" } as const;
+export const naglowekEksportu = (nr: string) => `Wniosek ${nr} — wygenerowany z systemu Aura Expert`;
+export const WZOR_NAGLOWKA_EKSPORTU = /^Wniosek MIE-\d{6}-[0-9A-F]{6} — wygenerowany z systemu Aura Expert$/;
+
+export function wczytajSzablon(): ArrayBuffer {
   const binarnie = atob(SZABLON_XLSX_BASE64);
   const bajty = new Uint8Array(binarnie.length);
   for (let i = 0; i < binarnie.length; i++) bajty[i] = binarnie.charCodeAt(i);
@@ -144,9 +153,9 @@ export async function zbudujExcelWniosku(
     ustaw(wsFirma, i, "Szacunkowy roczny obrót", dane.roczny_obrot);
 
     // Numer referencyjny w naglowku, zeby plik dalo sie powiazac z wnioskiem w panelu.
-    const naglowek = wsFirma.getCell("B3");
+    const naglowek = wsFirma.getCell(NAGLOWEK_EKSPORTU.adres);
     if (!naglowek.formula) {
-      naglowek.value = `Wniosek ${meta.nrReferencyjny} — wygenerowany z systemu Aura Expert`;
+      naglowek.value = naglowekEksportu(meta.nrReferencyjny);
     }
   }
 
@@ -298,7 +307,9 @@ export async function zbudujExcelWniosku(
     const uwagi = pominiete.length
       ? `${dane.uwagi}\n\nNie zmieściło się w szablonie: ${pominiete.join("; ")}`.trim()
       : dane.uwagi;
-    ustaw(wsPodsum, i, "Uwagi, opis działalności, pytania do agenta", uwagi);
+    // Uwagi ida do ramki POD etykieta (scalone B37:F41), nie obok niej.
+    const nrUwag = i.get(norm("Uwagi, opis działalności, pytania do agenta"));
+    if (nrUwag) wsPodsum.getRow(nrUwag + 1).getCell(2).value = uwagi || null;
     ustaw(wsPodsum, i, "Miejscowość i data", dane.miejscowosc_podpisu);
   }
 

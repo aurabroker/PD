@@ -16,7 +16,7 @@ export default async function ListaWnioskow({
   let zapytanie = supabaseAdmin()
     .from("mienie_wnioski")
     .select(
-      "id, nr_referencyjny, nazwa_firmy, nip, email_kontaktowy, telefon, status, zrodlo, suma_lacznie, created_at, updated_at",
+      "id, nr_referencyjny, nazwa_firmy, nip, email_kontaktowy, telefon, status, zrodlo, import_zgodnosc, suma_lacznie, created_at, updated_at",
     )
     .order("updated_at", { ascending: false })
     .limit(200);
@@ -100,6 +100,14 @@ export default async function ListaWnioskow({
                   <span className="mt-0.5 block text-xs text-stone-400">
                     {w.zrodlo === "excel" ? "z pliku Excel" : w.zrodlo === "agent" ? "agent" : "formularz"}
                   </span>
+                  {w.import_zgodnosc && w.import_zgodnosc.zgodny === false && (
+                    <span
+                      className="mt-0.5 block text-xs font-medium text-amber-700"
+                      title="Zaczytany plik różni się od naszego szablonu — szczegóły w wniosku"
+                    >
+                      ⚠ plik niezgodny z szablonem
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <span className="block">{w.nazwa_firmy || <em className="text-stone-400">bez nazwy</em>}</span>

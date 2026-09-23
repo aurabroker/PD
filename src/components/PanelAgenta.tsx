@@ -12,6 +12,8 @@ type Props = {
   tokenWygasa: string | null;
   zrodlo: string;
   importPlik: string | null;
+  /** Porownanie zaczytanego pliku z szablonem; null gdy nie bylo importu. */
+  zgodnosc: { zgodny: boolean; roznice: string[]; liczba: number } | null;
   utworzony: string;
   wyslany: string | null;
   zakres: string[];
@@ -79,6 +81,33 @@ export default function PanelAgenta(props: Props) {
             <div className="flex justify-between gap-2">
               <dt className="text-stone-400">Plik</dt>
               <dd className="truncate text-stone-700" title={props.importPlik}>{props.importPlik}</dd>
+            </div>
+          )}
+          {props.zgodnosc && (
+            <div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-stone-400">Szablon</dt>
+                <dd className={props.zgodnosc.zgodny ? "text-emerald-700" : "font-medium text-amber-700"}>
+                  {props.zgodnosc.zgodny
+                    ? "oryginalny"
+                    : `zmieniony (${props.zgodnosc.liczba} ${props.zgodnosc.liczba === 1 ? "różnica" : "różnic"})`}
+                </dd>
+              </div>
+              {!props.zgodnosc.zgodny && (
+                <details className="mt-1 rounded bg-amber-50 p-2 text-amber-900">
+                  <summary className="cursor-pointer">
+                    Plik nie jest zgodny z naszym szablonem — sprawdź dane przed wysłaniem do TU
+                  </summary>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                    {props.zgodnosc.roznice.map((r, i) => (
+                      <li key={i} className="break-words">{r}</li>
+                    ))}
+                    {props.zgodnosc.liczba > props.zgodnosc.roznice.length && (
+                      <li>… i {props.zgodnosc.liczba - props.zgodnosc.roznice.length} więcej</li>
+                    )}
+                  </ul>
+                </details>
+              )}
             </div>
           )}
           <div className="flex justify-between">

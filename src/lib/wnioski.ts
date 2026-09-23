@@ -3,6 +3,7 @@ import { supabaseAdmin } from "./supabase/admin";
 import { doWierszaWniosku, doWierszyLokalizacji, zWierszy } from "./mapowanie";
 import { znormalizujNumeracje } from "./schema";
 import type { WniosekRoboczy } from "./schema";
+import type { Zgodnosc } from "./excel/zgodnosc";
 
 /**
  * Token dostepu do wniosku. Zachowuje format uzywany przez wczesniejsze wnioski
@@ -19,7 +20,12 @@ const WAZNOSC_DNI = 60;
 
 export async function utworzWniosek(
   daneWejsciowe: WniosekRoboczy,
-  opcje: { zrodlo: "web" | "excel" | "agent"; companyId?: number | null; nazwaPliku?: string },
+  opcje: {
+    zrodlo: "web" | "excel" | "agent";
+    companyId?: number | null;
+    nazwaPliku?: string;
+    zgodnosc?: Zgodnosc | null;
+  },
 ) {
   const dane = znormalizujNumeracje(daneWejsciowe);
   const supabase = supabaseAdmin();
@@ -35,6 +41,7 @@ export async function utworzWniosek(
       status: "roboczy",
       zrodlo: opcje.zrodlo,
       import_plik: opcje.nazwaPliku ?? null,
+      import_zgodnosc: opcje.zgodnosc ?? null,
       token_wygasa: wygasa,
     })
     .select("id, form_token, nr_referencyjny")

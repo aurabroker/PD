@@ -238,6 +238,7 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
           tokenWygasa={meta.token_wygasa}
           zrodlo={meta.zrodlo}
           importPlik={meta.import_plik}
+          zgodnosc={meta.import_zgodnosc ?? null}
           utworzony={meta.created_at}
           wyslany={meta.wyslano_at}
           zakres={dane.zakres}

@@ -16,6 +16,7 @@ import {
   ZAKRES,
   ZAKRES_ALIASY,
 } from "../slowniki";
+import { zbadajZgodnosc, type Zgodnosc } from "./zgodnosc";
 
 /**
  * Import wniosku z szablonu .xlsx.
@@ -30,6 +31,8 @@ export type OstrzezenieImportu = { arkusz: string; opis: string };
 export type WynikImportu = {
   dane: WniosekRoboczy;
   ostrzezenia: OstrzezenieImportu[];
+  /** Czy plik to nasz szablon — dla agenta, nie blokuje importu. */
+  zgodnosc: Zgodnosc | null;
 };
 
 /** Normalizacja etykiety: bez ogonkow, bez gwiazdki pola wymaganego, bez podwojnych spacji. */
@@ -425,7 +428,14 @@ export async function wczytajWniosekZExcela(plik: ArrayBuffer): Promise<WynikImp
     podsumowanie.roczna_skladka_obecna = skladka
       ? komorkaLiczba(wartosc(wsPodsum, indeks, "Roczna składka (PLN)"))
       : null;
-    podsumowanie.uwagi = tp("Uwagi, opis działalności, pytania do agenta");
+    // Pole uwag to scalona ramka POD etykieta (w szablonie B37:F41), a nie komorka
+    // obok niej jak w pozostalych polach. Kolumna C wiersza etykiety zostaje jako
+    // zapas — tam zapisywaly uwagi eksporty sprzed poprawki.
+    const nrUwag = indeks.get(norm("Uwagi, opis działalności, pytania do agenta"));
+    podsumowanie.uwagi = nrUwag
+      ? komorkaTekst(wsPodsum.getRow(nrUwag + 1).getCell(2)).trim() ||
+        tp("Uwagi, opis działalności, pytania do agenta")
+      : "";
     podsumowanie.miejscowosc_podpisu = tp("Miejscowość i data");
     podsumowanie.zgoda_prawdziwosc = Boolean(
       indeks.get(norm("Oświadczam, że wszystkie informacje podane w niniejszym wniosku są zgodne z prawdą i odzwierciedlają rzeczywisty stan faktyczny.")),
@@ -460,5 +470,11 @@ export async function wczytajWniosekZExcela(plik: ArrayBuffer): Promise<WynikImp
     }
   }
 
-  return { dane: wniosekRoboczySchema.parse(surowe), ostrzezenia };
+  // Blad porownania z szablonem nie moze zablokowac importu — wtedy brak wyniku.
+  const zgodnosc = await zbadajZgodnosc(skoroszyt).catch((e) => {
+    console.error("[import] porownanie z szablonem:", e);
+    return null;
+  });
+
+  return { dane: wniosekRoboczySchema.parse(surowe), ostrzezenia, zgodnosc };
 }

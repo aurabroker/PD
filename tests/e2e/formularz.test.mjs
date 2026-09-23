@@ -276,6 +276,25 @@ await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie
   sprawdz(readFileSync(sciezka).length > 20000, "pobrano plik .xlsx", `${readFileSync(sciezka).length} B`);
   writeFileSync(sciezka + ".token", token);
 
+  // Ponowny import wlasnego eksportu: uwagi musza wrocic, a plik byc rozpoznany jako nasz szablon.
+  const uwagiT1 = sql(`select uwagi from mienie_wnioski where form_token='${token}'`);
+  await page.goto(APP + "/");
+  await page.locator('input[type=file][name="plik"]').setInputFiles(sciezka);
+  await page.getByRole("button", { name: "Wczytaj wniosek z pliku" }).click();
+  const doPoprawyT1 = page.getByRole("button", { name: "Przejdź do wniosku i popraw" });
+  await Promise.race([
+    page.waitForURL(/\/wniosek\//, { timeout: 30000 }).catch(() => {}),
+    doPoprawyT1.waitFor({ timeout: 30000 }).catch(() => {}),
+  ]);
+  if (await doPoprawyT1.isVisible().catch(() => false)) {
+    await doPoprawyT1.click();
+    await page.waitForURL(/\/wniosek\//, { timeout: 20000 });
+  }
+  const tokenPonowny = decodeURIComponent(page.url().split("/wniosek/")[1].split("?")[0]);
+  const [uwPonowne, zgPonowny] = sql(`select uwagi, import_zgodnosc->>'zgodny' from mienie_wnioski where form_token='${tokenPonowny}'`).split("|");
+  sprawdz(uwPonowne === uwagiT1, "ponowny import własnego eksportu: uwagi wracają bez zmian", `${uwPonowne} ≠ ${uwagiT1}`);
+  sprawdz(zgPonowny === "true", "własny eksport rozpoznany jako oryginalny szablon", zgPonowny);
+
   // Ponowne wejscie na link - formularz ma byc zamkniety
   await page.goto(`${APP}/wniosek/${token}`);
   sprawdz(await page.getByText("Wniosek został już złożony").isVisible(), "ponowne wejście na link pokazuje 'już złożony', nie formularz");
@@ -379,6 +398,10 @@ await uruchom("T7 import Excela przez stronę i złożenie", async ({ page }) =>
   sprawdz((await pole(page, "nazwa_firmy").inputValue()) === "Beauty Studio Aurora sp. z o.o.", "nazwa firmy z pliku w formularzu");
   const zr = sql(`select zrodlo, import_plik from mienie_wnioski where form_token='${token}'`);
   sprawdz(zr.startsWith("excel|"), "DB: zrodlo = excel, zapisana nazwa pliku", zr);
+  const uw7 = sql(`select uwagi from mienie_wnioski where form_token='${token}'`);
+  sprawdz(uw7 === "Prosimy o wycenę wariantu z ochroną cyber.", "uwagi wczytane z ramki pod etykietą (B37)", uw7);
+  const zg7 = sql(`select import_zgodnosc->>'zgodny' from mienie_wnioski where form_token='${token}'`);
+  sprawdz(zg7 === "true", "DB: wypełniony oryginalny szablon rozpoznany jako zgodny", zg7);
   await krok(page, "Podsumowanie");
   await zaznacz(page, "zgoda_prawdziwosc");
   await zaznacz(page, "zgoda_rodo");
@@ -607,6 +630,34 @@ await uruchom("T15 weryfikacja firmy w REGON (przycisk → akcja → odpowiedź)
   sprawdz(odpowiedzial, "przycisk REGON zwraca wynik lub czytelny błąd, bez awarii");
   // Formularz nadal działa po weryfikacji.
   sprawdz((await pole(page, "nip").inputValue()) === "1111111111", "formularz zachowuje wpisany NIP po próbie weryfikacji");
+}, browser);
+
+// ---------------------------------------------------------------------------
+await uruchom("T16 przerobiony szablon: import przechodzi, agent widzi różnice", async ({ page }) => {
+  const katalog = mkdtempSync(path.join(tmpdir(), "przerobiony-"));
+  generujKorpus(katalog);
+  await page.goto(APP + "/");
+  await page.locator('input[type=file][name="plik"]').setInputFiles(path.join(katalog, "przerobiony-szablon.xlsx"));
+  await page.getByRole("button", { name: "Wczytaj wniosek z pliku" }).click();
+  const doPoprawy = page.getByRole("button", { name: "Przejdź do wniosku i popraw" });
+  await Promise.race([
+    page.waitForURL(/\/wniosek\//, { timeout: 30000 }).catch(() => {}),
+    doPoprawy.waitFor({ timeout: 30000 }).catch(() => {}),
+  ]);
+  if (await doPoprawy.isVisible().catch(() => false)) {
+    await doPoprawy.click();
+    await page.waitForURL(/\/wniosek\//, { timeout: 20000 });
+  }
+  sprawdz(/\/wniosek\//.test(page.url()), "przerobiony, ale bezpieczny plik zostaje przyjęty (nie blokujemy klienta)");
+  const token = decodeURIComponent(page.url().split("/wniosek/")[1].split("?")[0]);
+  const [zg, liczba, roznice] = sql(
+    `select import_zgodnosc->>'zgodny', import_zgodnosc->>'liczba', import_zgodnosc->>'roznice' from mienie_wnioski where form_token='${token}'`,
+  ).split("|");
+  sprawdz(zg === "false", "DB: plik oznaczony jako niezgodny z szablonem", zg);
+  sprawdz(liczba === "3", "DB: dokładnie 3 różnice", liczba);
+  sprawdz(/B7.*Numer rachunku/.test(roznice), "różnica: podmieniona etykieta NIP", roznice);
+  sprawdz(/C13.*HYPERLINK/.test(roznice), "różnica: formuła z linkiem w polu e-mail", roznice);
+  sprawdz(/H40.*poza polami/.test(roznice), "różnica: ukryta treść poza polami formularza", roznice);
 }, browser);
 
 await browser.close();

@@ -154,10 +154,11 @@ export async function akcjaImportujExcel(formData: FormData): Promise<WynikImpor
     // Kontrola bezpieczenstwa struktury ZIP/XML PRZED rozpakowaniem przez ExcelJS.
     await sprawdzPlikXlsx(bufor);
 
-    const { dane, ostrzezenia } = await wczytajWniosekZExcela(bufor);
+    const { dane, ostrzezenia, zgodnosc } = await wczytajWniosekZExcela(bufor);
     const utworzony = await utworzWniosek(dane, {
       zrodlo: "excel",
       nazwaPliku: bezpiecznaNazwaPliku(plik.name),
+      zgodnosc,
     });
     return { ok: true, token: utworzony.form_token, ostrzezenia };
   } catch (e) {
