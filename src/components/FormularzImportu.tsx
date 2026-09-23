@@ -16,8 +16,29 @@ export default function FormularzImportu() {
     setBlad("");
     setOstrzezenia(null);
 
+    // Kontrola po stronie klienta — zanim plik poleci na serwer. Serwerowy
+    // limit ciala akcji to ~1 MB, wiec wiekszy plik i tak by sie wysypal.
+    const plik = formData.get("plik");
+    if (plik instanceof File) {
+      if (!plik.name.toLowerCase().endsWith(".xlsx")) {
+        setBlad("Obsługujemy tylko pliki .xlsx. Jeśli masz plik .xls, zapisz go w Excelu jako .xlsx.");
+        return;
+      }
+      if (plik.size > 1024 * 1024) {
+        setBlad("Plik jest większy niż 1 MB — to nie wygląda na wniosek.");
+        return;
+      }
+    }
+
     startTransition(async () => {
-      const wynik = await akcjaImportujExcel(formData);
+      let wynik: Awaited<ReturnType<typeof akcjaImportujExcel>>;
+      try {
+        wynik = await akcjaImportujExcel(formData);
+      } catch {
+        // Najczestszy powod: przekroczony limit ciala serwerowej akcji.
+        setBlad("Nie udało się wczytać pliku. Sprawdź, czy to wypełniony szablon .xlsx nie większy niż 1 MB.");
+        return;
+      }
 
       if (!wynik.ok) {
         setBlad(wynik.blad);

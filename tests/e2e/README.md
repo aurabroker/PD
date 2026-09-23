@@ -26,6 +26,11 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 | T11 | ten sam wniosek w dwóch kartach naraz |
 | T12 | data wpisana ręcznie jak w Safari (`23.09.2026`, `jutro`) |
 | T13 | utrata zasięgu w trakcie wypełniania i powrót |
+| T14 | import złośliwych plików: bomby dekompresyjne, XXE/billion laughs, makra i obiekty OLE, formuły w treści, podmienione rozszerzenie, uszkodzone i za duże archiwum |
+
+Korpus złośliwych plików do T14 generuje `tests/e2e/generuj-zlosliwe.mjs`
+(bez zależności, sam z szablonu i wypełnionego wniosku). Można go uruchomić
+też ręcznie: `node tests/e2e/generuj-zlosliwe.mjs <katalog>`.
 
 Każdy scenariusz dodatkowo nie przechodzi, gdy pojawi się jakikolwiek wyjątek JS,
 błąd w konsoli albo odpowiedź 4xx/5xx.

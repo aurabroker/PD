@@ -73,7 +73,7 @@ export default async function ListaWnioskow({
           ))}
         </select>
         <button type="submit" className="przycisk-drugi">Filtruj</button>
-        <a href="/api/admin/eksport" className="przycisk-drugi ml-auto">Eksport CSV</a>
+        <a href="/api/admin/eksport" className="przycisk-drugi ml-auto">Eksport XLSX</a>
       </form>
 
       {error && <p className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error.message}</p>}

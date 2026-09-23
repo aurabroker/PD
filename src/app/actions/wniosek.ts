@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { biezacyAdmin } from "@/lib/autoryzacja";
+import { sprawdzPlikXlsx, BladPliku } from "@/lib/excel/bezpieczenstwo";
 import { wczytajWniosekZExcela } from "@/lib/excel/parse";
 import type { OstrzezenieImportu } from "@/lib/excel/parse";
 import { pustyWniosek, wniosekDoZlozeniaSchema, wniosekRoboczySchema } from "@/lib/schema";
@@ -120,25 +121,45 @@ export async function akcjaImportujExcel(formData: FormData): Promise<WynikImpor
     };
   }
 
-  // 10 MB wystarcza z zapasem na wypelniony szablon; wiekszy plik to zwykle pomylka.
-  if (plik.size > 10 * 1024 * 1024) {
-    return { ok: false, blad: "Plik jest większy niż 10 MB — to nie wygląda na wniosek." };
+  // Wypelniony szablon ma ~130 KB; 1 MB to bezpieczny sufit. Wiekszy plik odrzucamy
+  // od razu, zanim trafi do serwera akcji (limit ciala i tak wynosi ~1 MB).
+  if (plik.size > 1024 * 1024) {
+    return { ok: false, blad: "Plik jest większy niż 1 MB — to nie wygląda na wniosek." };
   }
 
   try {
-    const { dane, ostrzezenia } = await wczytajWniosekZExcela(await plik.arrayBuffer());
-    const utworzony = await utworzWniosek(dane, { zrodlo: "excel", nazwaPliku: plik.name });
+    const bufor = await plik.arrayBuffer();
+    // Kontrola bezpieczenstwa struktury ZIP/XML PRZED rozpakowaniem przez ExcelJS.
+    await sprawdzPlikXlsx(bufor);
+
+    const { dane, ostrzezenia } = await wczytajWniosekZExcela(bufor);
+    const utworzony = await utworzWniosek(dane, {
+      zrodlo: "excel",
+      nazwaPliku: bezpiecznaNazwaPliku(plik.name),
+    });
     return { ok: true, token: utworzony.form_token, ostrzezenia };
   } catch (e) {
+    // Komunikat z kontroli bezpieczenstwa jest bezpieczny do pokazania.
+    // Bledy z ExcelJS (wewnetrzne sciezki, adresy JSZip) zastepujemy ogolnym.
+    if (e instanceof BladPliku) {
+      return { ok: false, blad: e.message };
+    }
     console.error("[akcjaImportujExcel] blad importu:", e);
     return {
       ok: false,
-      blad:
-        e instanceof Error
-          ? e.message
-          : "Nie udało się odczytać pliku. Sprawdź, czy to wypełniony szablon wniosku.",
+      blad: "Nie udało się odczytać pliku. Sprawdź, czy to wypełniony szablon wniosku (.xlsx).",
     };
   }
+}
+
+/** Nazwa pliku do zapisu w bazie: bez sciezek, bez znakow sterujacych, przycieta. */
+function bezpiecznaNazwaPliku(nazwa: string): string {
+  const podstawa = nazwa.split(/[\\/]/).pop() ?? "wniosek.xlsx";
+  return podstawa
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/[^\p{L}\p{N} ._-]/gu, "_")
+    .slice(0, 120)
+    .trim() || "wniosek.xlsx";
 }
 
 /** Zmiana statusu wniosku w panelu. */

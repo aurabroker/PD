@@ -38,10 +38,23 @@ type Tryb = "pelny" | "roboczy";
 function zbuduj(tryb: Tryb) {
   const pelny = tryb === "pelny";
 
-  const tekst = z.string().trim().catch("").default("");
+  // Twardy limit dlugosci pojedynczego pola tekstowego. Chroni baze i pamiec
+  // przed wpisem-gigantem z zaczytanego pliku; 2000 znakow starcza na adres,
+  // nazwe firmy czy opis dzialalnosci z ogromnym zapasem.
+  const LIMIT_TEKST = 2000;
+  const przytnij = (s: string) => s.slice(0, LIMIT_TEKST);
+
+  const tekst = z
+    .string()
+    .trim()
+    .catch("")
+    .default("")
+    .transform(przytnij);
 
   const wymagany = (komunikat: string) =>
-    pelny ? z.string().trim().min(1, komunikat) : tekst;
+    pelny
+      ? z.string().trim().min(1, komunikat).max(LIMIT_TEKST, "Wpis jest zbyt długi").transform(przytnij)
+      : tekst;
 
   /** Pole slownikowe: pusta wartosc albo wartosc z listy. W wersji roboczej dowolny tekst. */
   const zeSlownika = <T extends readonly [string, ...string[]]>(lista: T) =>
@@ -89,7 +102,9 @@ function zbuduj(tryb: Tryb) {
         )
     : tekst;
 
-  const email = pelny ? z.string().trim().email("Podaj poprawny adres e-mail") : tekst;
+  const email = pelny
+    ? z.string().trim().max(320, "Adres e-mail jest zbyt długi").email("Podaj poprawny adres e-mail")
+    : tekst;
 
   const urzadzenieMedyczne = z.object({
     lokalizacja: numerLokalizacji,

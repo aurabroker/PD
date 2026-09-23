@@ -11,10 +11,11 @@
  */
 import { chromium } from "playwright";
 import { execSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { generujKorpus } from "./generuj-zlosliwe.mjs";
 
 const KATALOG = path.dirname(fileURLToPath(import.meta.url));
 const TMP = tmpdir();
@@ -533,6 +534,59 @@ await uruchom("T13 utrata zasięgu w trakcie wypełniania", async ({ page, ctx, 
   sprawdz(w === "Wpisane bez zasięgu / Po powrocie zasięgu", "DB: zapisane także to, co wpisano bez zasięgu", w);
   // bledy sieci przegladarki sa tu oczekiwane - liczy sie tylko brak wyjatkow JS
   for (let i = bledy.length - 1; i >= 0; i--) if (!bledy[i].startsWith("pageerror")) bledy.splice(i, 1);
+}, browser);
+
+// ---------------------------------------------------------------------------
+await uruchom("T14 import złośliwych plików (bomby, XXE, makra, formuły, podmienione rozszerzenie)", async ({ page, bledy }) => {
+  const katalog = mkdtempSync(path.join(tmpdir(), "zlosliwe-"));
+  generujKorpus(katalog);
+
+  // Pliki, ktore MUSZA zostac odrzucone bez utworzenia wniosku.
+  const odrzucane = [
+    "xxe.xlsx", "billion-laughs.xlsx", "zip-bomba.xlsx", "bomba-wierszy.xlsx",
+    "makra-jako-xlsx.xlsx", "osadzony-obiekt.xlsx", "tysiace-wpisow.xlsx",
+    "uszkodzony.xlsx", "za-duzy.xlsx", "exe-jako-xlsx.xlsx", "html-jako-xlsx.xlsx",
+    "ole-jako-xlsx.xlsx",
+  ];
+
+  const przedWszystkie = Number(sql("select count(*) from mienie_wnioski"));
+
+  for (const nazwa of odrzucane) {
+    await page.goto(APP + "/");
+    await page.locator('input[type=file][name="plik"]').setInputFiles(path.join(katalog, nazwa));
+    await page.getByRole("button", { name: "Wczytaj wniosek z pliku" }).click();
+    // Komunikat bledu ma sie pokazac, bez przekierowania do formularza.
+    const blad = await page.locator(".text-red-600").first().innerText({ timeout: 15000 }).catch(() => "");
+    sprawdz(blad.length > 0, `odrzucono: ${nazwa}`, blad.slice(0, 70) || "brak komunikatu");
+    sprawdz(!/\/wniosek\//.test(page.url()), `brak przejścia do formularza: ${nazwa}`, page.url());
+  }
+
+  const poWszystkie = Number(sql("select count(*) from mienie_wnioski"));
+  sprawdz(poWszystkie === przedWszystkie, "DB: żaden złośliwy plik nie utworzył wniosku", `${przedWszystkie} -> ${poWszystkie}`);
+
+  // Formuly w tresci: plik jest poprawny strukturalnie, wiec zostaje przyjety,
+  // ale wartosc „=cmd|…" ma byc zapisana DOSLOWNIE jako tekst — nie jako formula.
+  await page.goto(APP + "/");
+  await page.locator('input[type=file][name="plik"]').setInputFiles(path.join(katalog, "formuly-w-tresci.xlsx"));
+  await page.getByRole("button", { name: "Wczytaj wniosek z pliku" }).click();
+  // „=cmd|…" nie jest poprawnym e-mailem, wiec import konczy sie ekranem ostrzezen
+  // — przechodzimy przez niego do formularza. Kluczowe: plik zostal przyjety.
+  const doPoprawy = page.getByRole("button", { name: "Przejdź do wniosku i popraw" });
+  await Promise.race([
+    page.waitForURL(/\/wniosek\//, { timeout: 20000 }).catch(() => {}),
+    doPoprawy.waitFor({ timeout: 20000 }).catch(() => {}),
+  ]);
+  if (await doPoprawy.isVisible().catch(() => false)) {
+    await doPoprawy.click();
+    await page.waitForURL(/\/wniosek\//, { timeout: 20000 });
+  }
+  sprawdz(/\/wniosek\//.test(page.url()), "plik z formułą w treści został przyjęty (poprawny strukturalnie)", page.url());
+  const token = page.url().match(/wniosek\/([^/?]+)/)[1];
+  const email = sql(`select coalesce(email_kontaktowy,'') from mienie_wnioski where form_token='${token}'`);
+  sprawdz(email === "=cmd|' /C calc'!A0", "DB: formuła zapisana dosłownie jako tekst (nieuruchomiona)", email);
+  // W formularzu wartosc widoczna doslownie, bez wykonania.
+  const wpole = await pole(page, "email_kontaktowy").inputValue().catch(() => "");
+  sprawdz(wpole === "=cmd|' /C calc'!A0", "formularz pokazuje formułę jako zwykły tekst", wpole);
 }, browser);
 
 await browser.close();

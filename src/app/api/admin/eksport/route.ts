@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
+import ExcelJS from "exceljs";
 import { biezacyAdmin } from "@/lib/autoryzacja";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-/** Eksport listy wnioskow do CSV - do wklejenia w arkusz lub do zestawienia dla TU. */
+/**
+ * Eksport listy wnioskow do .xlsx.
+ *
+ * Celowo nie CSV: w CSV komorka zaczynajaca sie od = + - @ jest przez Excela
+ * traktowana jak formula (CSV injection). ExcelJS zapisuje kazda wartosc jako
+ * komorke tekstowa (typ „s"), wiec „=cmd|…" z pola wniosku pokaze sie doslownie
+ * i nigdy nie zostanie wykonane.
+ */
 export async function GET() {
   if (!(await biezacyAdmin())) {
     return NextResponse.json({ blad: "Brak uprawnień." }, { status: 401 });
@@ -17,32 +25,51 @@ export async function GET() {
     )
     .order("created_at", { ascending: false });
 
-  const naglowki = [
-    "Numer", "Status", "Źródło", "Ubezpieczający", "NIP", "E-mail",
-    "Telefon", "Działalność", "Suma ubezpieczenia", "Utworzony", "Złożony",
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Wnioski majątkowe");
+
+  ws.columns = [
+    { header: "Numer", key: "nr", width: 18 },
+    { header: "Status", key: "status", width: 14 },
+    { header: "Źródło", key: "zrodlo", width: 10 },
+    { header: "Ubezpieczający", key: "firma", width: 34 },
+    { header: "NIP", key: "nip", width: 14 },
+    { header: "E-mail", key: "email", width: 26 },
+    { header: "Telefon", key: "telefon", width: 18 },
+    { header: "Działalność", key: "dzialalnosc", width: 30 },
+    { header: "Suma ubezpieczenia", key: "suma", width: 18 },
+    { header: "Utworzony", key: "utworzony", width: 14 },
+    { header: "Złożony", key: "zlozony", width: 14 },
   ];
+  ws.getRow(1).font = { bold: true };
+  ws.views = [{ state: "frozen", ySplit: 1 }];
 
-  // Srednik jako separator - polski Excel tak otwiera CSV bez kreatora importu.
-  const naCsv = (v: unknown) => {
-    const s = v == null ? "" : String(v);
-    return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
+  // Wartosc jako TEKST — nigdy nie jako formula. Number() tylko dla sumy.
+  const t = (v: unknown) => (v == null ? "" : String(v));
 
-  const wiersze = (data ?? []).map((w) =>
-    [
-      w.nr_referencyjny, w.status, w.zrodlo, w.nazwa_firmy, w.nip, w.email_kontaktowy,
-      w.telefon, w.rodzaj_dzialalnosci, w.suma_lacznie,
-      w.created_at?.slice(0, 10), w.wyslano_at?.slice(0, 10) ?? "",
-    ].map(naCsv).join(";"),
-  );
+  for (const w of data ?? []) {
+    ws.addRow({
+      nr: t(w.nr_referencyjny),
+      status: t(w.status),
+      zrodlo: t(w.zrodlo),
+      firma: t(w.nazwa_firmy),
+      nip: t(w.nip),
+      email: t(w.email_kontaktowy),
+      telefon: t(w.telefon),
+      dzialalnosc: t(w.rodzaj_dzialalnosci),
+      suma: typeof w.suma_lacznie === "number" ? w.suma_lacznie : Number(w.suma_lacznie) || 0,
+      utworzony: w.created_at?.slice(0, 10) ?? "",
+      zlozony: w.wyslano_at?.slice(0, 10) ?? "",
+    });
+  }
 
-  // BOM, zeby Excel rozpoznal UTF-8 i nie zepsul polskich znakow.
-  const csv = "﻿" + [naglowki.join(";"), ...wiersze].join("\r\n");
+  const bufor = await wb.xlsx.writeBuffer();
+  const nazwa = `wnioski-majatkowe-${new Date().toISOString().slice(0, 10)}.xlsx`;
 
-  return new NextResponse(csv, {
+  return new NextResponse(bufor, {
     headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="wnioski-majatkowe-${new Date().toISOString().slice(0, 10)}.csv"`,
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${nazwa}"`,
       "Cache-Control": "no-store",
     },
   });
