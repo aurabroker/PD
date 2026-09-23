@@ -27,6 +27,7 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 | T12 | data wpisana ręcznie jak w Safari (`23.09.2026`, `jutro`) |
 | T13 | utrata zasięgu w trakcie wypełniania i powrót |
 | T14 | import złośliwych plików: bomby dekompresyjne, XXE/billion laughs, makra i obiekty OLE, formuły w treści, podmienione rozszerzenie, uszkodzone i za duże archiwum |
+| T15 | weryfikacja firmy w REGON: przycisk → akcja → wynik lub czytelny błąd, bez awarii formularza |
 
 Korpus złośliwych plików do T14 generuje `tests/e2e/generuj-zlosliwe.mjs`
 (bez zależności, sam z szablonu i wypełnionego wniosku). Można go uruchomić

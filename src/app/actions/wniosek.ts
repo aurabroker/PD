@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { biezacyAdmin } from "@/lib/autoryzacja";
 import { zweryfikujTurnstile } from "@/lib/turnstile";
+import { weryfikujRegon, type WynikRegon } from "@/lib/regon";
 import { sprawdzPlikXlsx, BladPliku } from "@/lib/excel/bezpieczenstwo";
 import { wczytajWniosekZExcela } from "@/lib/excel/parse";
 import type { OstrzezenieImportu } from "@/lib/excel/parse";
@@ -16,6 +17,11 @@ import { STATUS } from "@/lib/slowniki";
 export type WynikAkcji =
   | { ok: true; komunikat?: string }
   | { ok: false; blad: string; bledyPol?: Record<string, string> };
+
+/** Weryfikacja firmy po NIP w bazie REGON (GUS BIR). Wolana z formularza. */
+export async function akcjaWeryfikujRegon(nip: string): Promise<WynikRegon> {
+  return weryfikujRegon(nip);
+}
 
 /** Adres IP klienta z naglowkow Cloudflare — przekazywany do weryfikacji Turnstile. */
 async function ipKlienta(): Promise<string | null> {

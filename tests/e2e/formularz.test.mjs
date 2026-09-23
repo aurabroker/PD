@@ -589,6 +589,26 @@ await uruchom("T14 import złośliwych plików (bomby, XXE, makra, formuły, pod
   sprawdz(wpole === "=cmd|' /C calc'!A0", "formularz pokazuje formułę jako zwykły tekst", wpole);
 }, browser);
 
+// ---------------------------------------------------------------------------
+await uruchom("T15 weryfikacja firmy w REGON (przycisk → akcja → odpowiedź)", async ({ page }) => {
+  await nowyWniosek(page);
+  await wpisz(page, "nip", "1111111111");
+  await page.getByRole("button", { name: /Sprawdź firmę w REGON/ }).click();
+  // Bez klucza produkcyjnego i przy zablokowanym połączeniu z GUS w środowisku
+  // testowym oczekujemy albo karty z danymi, albo czytelnego komunikatu o
+  // niedostępności — nigdy wyjątku ani zawieszenia formularza.
+  const karta = page.getByText(/REGON:/);
+  const blad = page.locator(".text-red-600");
+  await Promise.race([
+    karta.waitFor({ timeout: 30000 }).catch(() => {}),
+    blad.first().waitFor({ timeout: 30000 }).catch(() => {}),
+  ]);
+  const odpowiedzial = (await karta.isVisible().catch(() => false)) || (await blad.first().isVisible().catch(() => false));
+  sprawdz(odpowiedzial, "przycisk REGON zwraca wynik lub czytelny błąd, bez awarii");
+  // Formularz nadal działa po weryfikacji.
+  sprawdz((await pole(page, "nip").inputValue()) === "1111111111", "formularz zachowuje wpisany NIP po próbie weryfikacji");
+}, browser);
+
 await browser.close();
 
 // ---------------------------------------------------------------------------

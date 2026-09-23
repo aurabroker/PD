@@ -17,6 +17,7 @@ import {
 import { Pole, PoleKwota, PoleObszar, PoleTakNie, PoleWybor, Sekcja } from "@/components/pola";
 import { zl } from "@/lib/format";
 import KrokLokalizacja from "./KrokLokalizacja";
+import WeryfikacjaRegon from "./WeryfikacjaRegon";
 import { TabelaSzkod, WykazElektroniki, WykazSprzetuMedycznego } from "./KrokiPomocnicze";
 
 type Props = {
@@ -310,6 +311,14 @@ function KrokDaneFirmy() {
           <Pole etykieta="Nazwa firmy / imię i nazwisko" wymagane blad={bledy.nazwa_firmy}
             rejestracja={register("nazwa_firmy")} />
           <Pole etykieta="NIP" podpowiedz="10 cyfr" blad={bledy.nip} rejestracja={register("nip")} />
+          <WeryfikacjaRegon
+            pobierzNip={() => getValues("nip")}
+            onZastosuj={(dane) => {
+              if (dane.nazwa) setValue("nazwa_firmy", dane.nazwa, { shouldDirty: true, shouldValidate: true });
+              if (dane.adres) setValue("adres_siedziby", dane.adres, { shouldDirty: true, shouldValidate: true });
+              if (dane.regon) setValue("regon", dane.regon, { shouldDirty: true });
+            }}
+          />
           <Pole etykieta="REGON" rejestracja={register("regon")} />
           <Pole etykieta="KRS" rejestracja={register("krs")} />
           <PoleWybor etykieta="Forma prawna" opcje={FORMA_PRAWNA} rejestracja={register("forma_prawna")} />
