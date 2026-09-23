@@ -8,8 +8,8 @@
  * dodatkowo kopiowana do kolumn wniosku, zeby starsze raporty czytajace tylko
  * `mienie_wnioski` nadal widzialy komplet danych.
  */
-import { pustaLokalizacja, sumaLokalizacji, wniosekSchema } from "./schema";
-import type { Lokalizacja, Wniosek } from "./schema";
+import { pustaLokalizacja, sumaLokalizacji, wniosekRoboczySchema, znormalizujNumeracje } from "./schema";
+import type { LokalizacjaRobocza, WniosekRoboczy } from "./schema";
 import { ZAKRES } from "./slowniki";
 import type { KluczSumy } from "./slowniki";
 
@@ -27,8 +27,36 @@ const numOrNull = (v: unknown): number | null => {
 };
 const bool = (v: unknown): boolean => v === true;
 
+/**
+ * Data do kolumny typu `date`: RRRR-MM-DD albo null.
+ *
+ * To jedyne pole, w ktorym tekst od klienta trafia wprost w typ bazodanowy.
+ * Chromium zawsze oddaje RRRR-MM-DD, ale Safari potrafi pokazac zwykle pole
+ * tekstowe i klient wpisze "23.09.2026". Postgres takiego zapisu nie przyjmie
+ * i odrzuci CALY zapis wniosku - dlatego rozpoznajemy polskie formaty,
+ * a czego nie da sie odczytac, zapisujemy jako brak daty zamiast wywracac zapis.
+ */
+export function naDateSql(v: unknown): string | null {
+  const t = String(v ?? "").trim();
+  if (!t) return null;
+
+  let r: number, m: number, d: number;
+  const iso = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  const pl = t.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
+  if (iso) [r, m, d] = [Number(iso[1]), Number(iso[2]), Number(iso[3])];
+  else if (pl) [d, m, r] = [Number(pl[1]), Number(pl[2]), Number(pl[3])];
+  else return null;
+
+  // Odrzuca daty nieistniejace (31.02) - Date przesunalby je po cichu na marzec.
+  const data = new Date(Date.UTC(r, m - 1, d));
+  if (data.getUTCFullYear() !== r || data.getUTCMonth() !== m - 1 || data.getUTCDate() !== d) return null;
+  if (r < 1900 || r > 2100) return null;
+
+  return `${r}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 /** Sumy ubezpieczenia jednej lokalizacji. */
-function kolumnySum(lok: Lokalizacja): Wiersz {
+function kolumnySum(lok: LokalizacjaRobocza): Wiersz {
   return {
     suma_budynek: lok.suma_budynek,
     suma_wyposazenie: lok.suma_wyposazenie,
@@ -50,7 +78,7 @@ function kolumnySum(lok: Lokalizacja): Wiersz {
  * przechowywal tu tylko lokalizacje 1, laczna suma bylaby zanizona przy kilku lokalizacjach,
  * a to ona pokazuje sie na liscie w panelu i w zestawieniach.
  */
-function kolumnySumZbiorczych(lokalizacje: Lokalizacja[]): Wiersz {
+function kolumnySumZbiorczych(lokalizacje: LokalizacjaRobocza[]): Wiersz {
   const suma = (klucz: KluczSumy) =>
     lokalizacje.reduce((acc, lok) => acc + (Number(lok[klucz]) || 0), 0);
 
@@ -69,7 +97,7 @@ function kolumnySumZbiorczych(lokalizacje: Lokalizacja[]): Wiersz {
 }
 
 /** Charakterystyka i zabezpieczenia lokalizacji - bez sum. */
-function kolumnyLokalizacji(lok: Lokalizacja): Wiersz {
+function kolumnyLokalizacji(lok: LokalizacjaRobocza): Wiersz {
   return {
     typ_lokalu: lok.typ_lokalu,
     pietro: lok.pietro,
@@ -106,7 +134,7 @@ function kolumnyLokalizacji(lok: Lokalizacja): Wiersz {
 }
 
 /** Wiersz tabeli `mienie_wnioski` na podstawie danych z formularza. */
-export function doWierszaWniosku(dane: Wniosek): Wiersz {
+export function doWierszaWniosku(dane: WniosekRoboczy): Wiersz {
   const pierwsza = dane.lokalizacje[0] ?? pustaLokalizacja(1);
 
   return {
@@ -149,7 +177,7 @@ export function doWierszaWniosku(dane: Wniosek): Wiersz {
 
     uwagi: dane.uwagi,
     miejscowosc_podpisu: dane.miejscowosc_podpisu,
-    data_podpisu: dane.data_podpisu || null,
+    data_podpisu: naDateSql(dane.data_podpisu),
     zgoda_prawdziwosc: dane.zgoda_prawdziwosc,
     zgoda_rodo: dane.zgoda_rodo,
 
@@ -163,17 +191,18 @@ export function doWierszaWniosku(dane: Wniosek): Wiersz {
 
 /** Wiersze tabeli `mienie_lokalizacje` dla danego wniosku. */
 export function doWierszyLokalizacji(
-  dane: Wniosek,
+  dane: WniosekRoboczy,
   wniosekId: string,
   companyId: number | null,
   formToken: string,
 ): Wiersz[] {
-  return dane.lokalizacje.map((lok) => ({
+  return dane.lokalizacje.map((lok, i) => ({
     wniosek_id: wniosekId,
     company_id: companyId,
     form_token: formToken,
-    nr: lok.nr,
-    nazwa: lok.nazwa || `Lokalizacja ${lok.nr}`,
+    // Numer z pozycji, nie z danych: gwarantuje ciaglosc 1..n przy upsercie.
+    nr: i + 1,
+    nazwa: lok.nazwa || `Lokalizacja ${i + 1}`,
     adres: lok.adres,
     ...kolumnyLokalizacji(lok),
     ...kolumnySum(lok),
@@ -184,7 +213,7 @@ export function doWierszyLokalizacji(
 }
 
 /** Odtworzenie lokalizacji z wiersza `mienie_lokalizacje`. */
-function zWierszaLokalizacji(w: Wiersz): Lokalizacja {
+function zWierszaLokalizacji(w: Wiersz): LokalizacjaRobocza {
   return {
     nr: num(w.nr) || 1,
     nazwa: txt(w.nazwa),
@@ -230,7 +259,7 @@ function zWierszaLokalizacji(w: Wiersz): Lokalizacja {
     suma_gotowka_transport: num(w.suma_gotowka_transport),
     suma_szyby: num(w.suma_szyby),
     suma_mienie_pracownikow: num(w.suma_mienie_pracownikow),
-  } as Lokalizacja;
+  } as LokalizacjaRobocza;
 }
 
 /**
@@ -239,12 +268,12 @@ function zWierszaLokalizacji(w: Wiersz): Lokalizacja {
  * Gdy wniosek nie ma jeszcze wierszy w `mienie_lokalizacje` (tak wygladaja wnioski
  * zlozone przed ta aplikacja), lokalizacja 1 jest odtwarzana z kolumn wniosku.
  */
-export function zWierszy(wniosek: Wiersz, lokalizacje: Wiersz[]): Wniosek {
+export function zWierszy(wniosek: Wiersz, lokalizacje: Wiersz[]): WniosekRoboczy {
   const zTabeli = lokalizacje
     .map(zWierszaLokalizacji)
     .sort((a, b) => a.nr - b.nr);
 
-  const zKolumnWniosku: Lokalizacja = {
+  const zKolumnWniosku: LokalizacjaRobocza = {
     ...zWierszaLokalizacji({ ...wniosek, nr: 1, adres: wniosek.adres_lokalizacji }),
     nazwa: "Lokalizacja 1",
   };
@@ -288,8 +317,10 @@ export function zWierszy(wniosek: Wiersz, lokalizacje: Wiersz[]): Wniosek {
     zgoda_rodo: bool(wniosek.zgoda_rodo),
   };
 
-  // Wnioski sprzed tej aplikacji moga miec puste pola wymagane - `catch` chroni
-  // panel przed wywroceniem sie na niekompletnym, ale wartosciowym rekordzie.
-  const wynik = wniosekSchema.safeParse(surowy);
-  return wynik.success ? wynik.data : ({ ...surowy } as unknown as Wniosek);
+  // Schemat roboczy nigdy nie odrzuca danych - wnioski w trakcie wypelniania
+  // i wnioski sprzed tej aplikacji maja puste pola wymagane, a i tak musza
+  // sie otworzyc w formularzu i w panelu.
+  // Normalizacja takze przy odczycie: wnioski zapisane wczesniej moga miec
+  // dziury w numeracji lokalizacji, a formularz zaklada numery 1..n.
+  return znormalizujNumeracje(wniosekRoboczySchema.parse(surowy));
 }

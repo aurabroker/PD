@@ -1,7 +1,7 @@
 import "server-only";
 import ExcelJS from "exceljs";
-import { pustaLokalizacja, wniosekSchema } from "../schema";
-import type { Lokalizacja, Wniosek } from "../schema";
+import { pustaLokalizacja, wniosekRoboczySchema, wniosekSchema } from "../schema";
+import type { Lokalizacja, WniosekRoboczy } from "../schema";
 import {
   ALARM_TYP,
   FORMA_PRAWNA,
@@ -28,7 +28,7 @@ import {
 export type OstrzezenieImportu = { arkusz: string; opis: string };
 
 export type WynikImportu = {
-  dane: Wniosek;
+  dane: WniosekRoboczy;
   ostrzezenia: OstrzezenieImportu[];
 };
 
@@ -305,7 +305,7 @@ export async function wczytajWniosekZExcela(plik: ArrayBuffer): Promise<WynikImp
   });
 
   // --- Wykaz sprzetu medycznego ---
-  const sprzetMedyczny: Wniosek["sprzet_medyczny"] = [];
+  const sprzetMedyczny: WniosekRoboczy["sprzet_medyczny"] = [];
   const wsMed = arkusz("Sprzęt medyczny");
   if (wsMed) {
     const { naglowki, wiersze } = wierszeTabeli(wsMed, "Lp.");
@@ -326,7 +326,7 @@ export async function wczytajWniosekZExcela(plik: ArrayBuffer): Promise<WynikImp
   }
 
   // --- Wykaz elektroniki EEI ---
-  const elektronika: Wniosek["elektronika_eei"] = [];
+  const elektronika: WniosekRoboczy["elektronika_eei"] = [];
   const wsEei = arkusz("Elektronika");
   if (wsEei) {
     const { naglowki, wiersze } = wierszeTabeli(wsEei, "Lp.");
@@ -347,7 +347,7 @@ export async function wczytajWniosekZExcela(plik: ArrayBuffer): Promise<WynikImp
 
   // --- Sekcja 7: szkodowosc ---
   let brakSzkod = true;
-  const szkody: Wniosek["szkody"] = [];
+  const szkody: WniosekRoboczy["szkody"] = [];
   const wsSzkody = arkusz("Szkodowość");
   if (wsSzkody) {
     const indeks = zindeksuj(wsSzkody);
@@ -447,23 +447,18 @@ export async function wczytajWniosekZExcela(plik: ArrayBuffer): Promise<WynikImp
     zgoda_rodo: false,
   };
 
-  // Import celowo uzywa luznego schematu: plik moze byc niekompletny,
+  // Pelny schemat tylko opisuje braki (np. pusty e-mail) jako ostrzezenia.
+  // Dane zawsze przechodza przez schemat roboczy - plik moze byc niekompletny,
   // a klient dopelnia braki w formularzu przed zlozeniem.
-  const wynik = wniosekSchema.safeParse(surowe);
-
-  if (!wynik.success) {
-    for (const problem of wynik.error.issues) {
+  const kontrola = wniosekSchema.safeParse(surowe);
+  if (!kontrola.success) {
+    for (const problem of kontrola.error.issues) {
       ostrzezenia.push({
         arkusz: String(problem.path[0] ?? "wniosek"),
         opis: `${problem.path.join(".")}: ${problem.message}`,
       });
     }
-    // Pola wymagane zostaja puste - formularz je wymusi.
-    return {
-      dane: { ...surowe } as unknown as Wniosek,
-      ostrzezenia,
-    };
   }
 
-  return { dane: wynik.data, ostrzezenia };
+  return { dane: wniosekRoboczySchema.parse(surowe), ostrzezenia };
 }

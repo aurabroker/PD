@@ -1,6 +1,6 @@
 import "server-only";
 import ExcelJS from "exceljs";
-import type { Wniosek } from "../schema";
+import type { WniosekRoboczy } from "../schema";
 import { sumaLokalizacji } from "../schema";
 import { SZABLON_XLSX_BASE64 } from "./szablon.generated";
 
@@ -111,7 +111,7 @@ function pojemnoscTabeli(ws: ExcelJS.Worksheet, nrNaglowka: number): number {
 }
 
 export async function zbudujExcelWniosku(
-  dane: Wniosek,
+  dane: WniosekRoboczy,
   meta: { nrReferencyjny: string },
 // Uint8Array<ArrayBuffer>, a nie samo Uint8Array: tylko ten wariant jest
 // akceptowany jako BodyInit przy budowaniu Response.

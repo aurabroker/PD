@@ -1,7 +1,8 @@
 import "server-only";
 import { supabaseAdmin } from "./supabase/admin";
 import { doWierszaWniosku, doWierszyLokalizacji, zWierszy } from "./mapowanie";
-import type { Wniosek } from "./schema";
+import { znormalizujNumeracje } from "./schema";
+import type { WniosekRoboczy } from "./schema";
 
 /**
  * Token dostepu do wniosku. Zachowuje format uzywany przez wczesniejsze wnioski
@@ -17,9 +18,10 @@ export function nowyToken(companyId: number | null): string {
 const WAZNOSC_DNI = 60;
 
 export async function utworzWniosek(
-  dane: Wniosek,
+  daneWejsciowe: WniosekRoboczy,
   opcje: { zrodlo: "web" | "excel" | "agent"; companyId?: number | null; nazwaPliku?: string },
 ) {
+  const dane = znormalizujNumeracje(daneWejsciowe);
   const supabase = supabaseAdmin();
   const token = nowyToken(opcje.companyId ?? null);
   const wygasa = new Date(Date.now() + WAZNOSC_DNI * 24 * 60 * 60 * 1000).toISOString();
@@ -44,29 +46,47 @@ export async function utworzWniosek(
   return data;
 }
 
-/** Lokalizacje zapisywane sa w calosci: kasujemy poprzednie i wstawiamy aktualny zestaw. */
+/**
+ * Zapis lokalizacji wniosku.
+ *
+ * Upsert po unikalnym (wniosek_id, nr), a potem usuniecie lokalizacji o numerach
+ * wiekszych niz aktualna liczba. Wczesniejsze "skasuj wszystko i wstaw od nowa"
+ * przy dwoch rownoleglych zapisach (autozapis + przycisk, dwie karty) moglo
+ * zostawic podwojone lokalizacje - a wniosek z 4+ lokalizacjami nie mieści sie
+ * w formularzu. Unikalny indeks w bazie wyklucza to niezaleznie od kodu.
+ */
 async function zapiszLokalizacje(
-  dane: Wniosek,
+  dane: WniosekRoboczy,
   wniosekId: string,
   companyId: number | null,
   token: string,
 ) {
   const supabase = supabaseAdmin();
-
-  await supabase.from("mienie_lokalizacje").delete().eq("wniosek_id", wniosekId);
-
   const wiersze = doWierszyLokalizacji(dane, wniosekId, companyId, token);
-  if (wiersze.length === 0) return;
 
-  const { error } = await supabase.from("mienie_lokalizacje").insert(wiersze);
-  if (error) throw new Error(`Nie udało się zapisać lokalizacji: ${error.message}`);
+  if (wiersze.length > 0) {
+    const { error } = await supabase
+      .from("mienie_lokalizacje")
+      .upsert(wiersze, { onConflict: "wniosek_id,nr" });
+    if (error) throw new Error(`Nie udało się zapisać lokalizacji: ${error.message}`);
+  }
+
+  const { error: bladUsuwania } = await supabase
+    .from("mienie_lokalizacje")
+    .delete()
+    .eq("wniosek_id", wniosekId)
+    .gt("nr", wiersze.length);
+  if (bladUsuwania) {
+    throw new Error(`Nie udało się usunąć nadmiarowych lokalizacji: ${bladUsuwania.message}`);
+  }
 }
 
 export async function zapiszWniosek(
   token: string,
-  dane: Wniosek,
+  daneWejsciowe: WniosekRoboczy,
   opcje: { zloz?: boolean } = {},
 ) {
+  const dane = znormalizujNumeracje(daneWejsciowe);
   const supabase = supabaseAdmin();
 
   const { data: istniejacy, error: bladOdczytu } = await supabase

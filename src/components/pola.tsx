@@ -1,7 +1,22 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { get, useFormContext } from "react-hook-form";
 import type { FieldError, UseFormRegisterReturn } from "react-hook-form";
+
+/**
+ * Blad pola odczytany z formularza po nazwie pola.
+ *
+ * Kazde pole samo znajduje swoj komunikat. Wczesniej trzeba bylo go przekazac
+ * recznie przez `blad={...}` - i w sumach ubezpieczenia tego zabraklo, przez co
+ * klient przy ujemnej kwocie widzial tylko "nie mozna zlozyc", bez wskazania pola.
+ */
+function useBladPola(nazwa: string, jawny?: { message?: string }) {
+  const kontekst = useFormContext();
+  if (jawny?.message) return jawny;
+  if (!kontekst) return undefined;
+  return get(kontekst.formState.errors, nazwa) as { message?: string } | undefined;
+}
 
 type Wspolne = {
   etykieta: string;
@@ -35,7 +50,8 @@ function Opakowanie({
   );
 }
 
-export function Pole({ etykieta, podpowiedz, wymagane, blad, rejestracja, typ = "text" }: Wspolne & { typ?: string }) {
+export function Pole({ etykieta, podpowiedz, wymagane, blad: jawny, rejestracja, typ = "text" }: Wspolne & { typ?: string }) {
+  const blad = useBladPola(rejestracja.name, jawny);
   return (
     <Opakowanie id={rejestracja.name} {...{ etykieta, podpowiedz, wymagane, blad }}>
       <input
@@ -49,7 +65,8 @@ export function Pole({ etykieta, podpowiedz, wymagane, blad, rejestracja, typ = 
   );
 }
 
-export function PoleObszar({ etykieta, podpowiedz, wymagane, blad, rejestracja, wiersze = 4 }: Wspolne & { wiersze?: number }) {
+export function PoleObszar({ etykieta, podpowiedz, wymagane, blad: jawny, rejestracja, wiersze = 4 }: Wspolne & { wiersze?: number }) {
+  const blad = useBladPola(rejestracja.name, jawny);
   return (
     <Opakowanie id={rejestracja.name} {...{ etykieta, podpowiedz, wymagane, blad }}>
       <textarea
@@ -63,7 +80,8 @@ export function PoleObszar({ etykieta, podpowiedz, wymagane, blad, rejestracja, 
 }
 
 /** Pole kwotowe. W bazie i w Excelu kwoty sa w pelnych zlotych. */
-export function PoleKwota({ etykieta, podpowiedz, wymagane, blad, rejestracja }: Wspolne) {
+export function PoleKwota({ etykieta, podpowiedz, wymagane, blad: jawny, rejestracja }: Wspolne) {
+  const blad = useBladPola(rejestracja.name, jawny);
   return (
     <Opakowanie id={rejestracja.name} {...{ etykieta, podpowiedz, wymagane, blad }}>
       <div className="relative">
@@ -88,11 +106,12 @@ export function PoleWybor({
   etykieta,
   podpowiedz,
   wymagane,
-  blad,
+  blad: jawny,
   rejestracja,
   opcje,
   pustaEtykieta = "— wybierz —",
 }: Wspolne & { opcje: readonly string[]; pustaEtykieta?: string }) {
+  const blad = useBladPola(rejestracja.name, jawny);
   return (
     <Opakowanie id={rejestracja.name} {...{ etykieta, podpowiedz, wymagane, blad }}>
       <select
@@ -121,7 +140,9 @@ export function PoleTakNie({
   podpowiedz?: string;
   rejestracja: UseFormRegisterReturn;
 }) {
+  const blad = useBladPola(rejestracja.name);
   return (
+    <div>
     <label
       htmlFor={rejestracja.name}
       className="flex cursor-pointer items-start gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2.5 transition hover:border-marka-200 hover:bg-marka-50/40"
@@ -137,6 +158,8 @@ export function PoleTakNie({
         {podpowiedz && <span className="mt-0.5 block text-xs text-stone-500">{podpowiedz}</span>}
       </span>
     </label>
+    {blad?.message && <p className="komunikat-bledu">{blad.message}</p>}
+    </div>
   );
 }
 

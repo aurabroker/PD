@@ -199,6 +199,15 @@ Bez tego wpisu poprawnie zalogowany użytkownik i tak zostanie odrzucony przez
 
 ## Testy
 
+**End-to-end formularza** — `tests/e2e/`, instrukcja w `tests/e2e/README.md`.
+13 scenariuszy w prawdziwej przeglądarce, na tym samym runtime co produkcja (workerd)
+i na bazie ze schematem 1:1 z BEAUTY. Sprawdza m.in. autozapis niekompletnego wniosku,
+wyścig zapisów z dwóch kart, usuwanie lokalizacji, datę wpisaną ręcznie jak w Safari,
+utratę zasięgu i widok na telefonie. **Uruchamiaj przed każdym wdrożeniem zmian
+w formularzu.**
+
+Testy jednostkowe importu i eksportu Excela:
+
 ```bash
 NODE_OPTIONS='--conditions=react-server' npx tsx scripts/test-import.ts <plik.xlsx>
 NODE_OPTIONS='--conditions=react-server' npx tsx scripts/test-roundtrip.ts <plik.xlsx>

@@ -55,18 +55,45 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu, nr
 
   const aktualny = kroki[Math.min(krok, kroki.length - 1)];
 
-  /** Zapis roboczy. Wywolywany recznie i automatycznie po zmianie danych. */
+  /**
+   * Zapisy ida po kolei, nigdy dwa naraz. Gdy w trakcie zapisu przyjdzie kolejna
+   * prosba (autozapis, klik "Zapisz"), zapamietujemy ja i wykonujemy jeden zapis
+   * po zakonczeniu biezacego - z najswiezszymi danymi. Po zlozeniu wniosku
+   * zapisy robocze sa wylaczone, zeby nie scigaly sie ze zlozeniem.
+   */
+  const trwaZapis = useRef(false);
+  const czekaZapis = useRef(false);
+  const zlozony = useRef(false);
+
   const zapisz = useCallback(async () => {
+    if (zlozony.current) return;
+    if (trwaZapis.current) {
+      czekaZapis.current = true;
+      return;
+    }
+
+    trwaZapis.current = true;
     setStanZapisu("zapisuje");
     setBladZapisu("");
 
-    const wynik = await akcjaZapiszRoboczy(token, metody.getValues());
-
-    if (wynik.ok) {
-      setStanZapisu("zapisano");
-    } else {
+    try {
+      do {
+        czekaZapis.current = false;
+        const wynik = await akcjaZapiszRoboczy(token, metody.getValues());
+        if (zlozony.current) return;
+        if (wynik.ok) {
+          setStanZapisu("zapisano");
+        } else {
+          setStanZapisu("blad");
+          setBladZapisu(wynik.blad);
+        }
+      } while (czekaZapis.current && !zlozony.current);
+    } catch {
+      // Zerwane polaczenie itp. - dane zostaja w formularzu, klient moze ponowic.
       setStanZapisu("blad");
-      setBladZapisu(wynik.blad);
+      setBladZapisu("Brak połączenia — dane są w formularzu, zapiszemy je przy następnej zmianie.");
+    } finally {
+      trwaZapis.current = false;
     }
   }, [token, metody]);
 
@@ -90,10 +117,24 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu, nr
     setSkladanie(true);
     setBladZapisu("");
 
-    const wynik = await akcjaZlozWniosek(token, metody.getValues());
+    // Autozapis nie moze wystartowac w trakcie skladania ani po nim.
+    if (timer.current) clearTimeout(timer.current);
+    zlozony.current = true;
+    while (trwaZapis.current) await new Promise((r) => setTimeout(r, 100));
+
+    let wynik;
+    try {
+      wynik = await akcjaZlozWniosek(token, metody.getValues());
+    } catch {
+      zlozony.current = false;
+      setSkladanie(false);
+      setBladZapisu("Brak połączenia — wniosek nie został wysłany. Spróbuj ponownie za chwilę.");
+      return;
+    }
 
     // Przy powodzeniu akcja przekierowuje, wiec tutaj jestesmy tylko przy bledzie.
-    if (!wynik.ok) {
+    if (wynik && !wynik.ok) {
+      zlozony.current = false;
       setSkladanie(false);
       setBladZapisu(wynik.blad);
 
@@ -236,9 +277,31 @@ function NawigacjaKrokow({
 }
 
 function KrokDaneFirmy() {
-  const { register, control, formState } = useFormContext<Wniosek>();
+  const { register, control, formState, getValues, setValue } = useFormContext<Wniosek>();
   const bledy = formState.errors;
-  const { fields, append, remove } = useFieldArray({ control, name: "lokalizacje" });
+  const { fields, append, replace } = useFieldArray({ control, name: "lokalizacje" });
+
+  /**
+   * Usuniecie lokalizacji z przenumerowaniem pozostalych na 1..n i przepieciem
+   * sprzetu. Bez tego po usunieciu srodkowej zostalyby numery 1 i 3, a sprzet
+   * wskazywalby na lokalizacje, ktorej juz nie ma. Sprzet z usunietej lokalizacji
+   * trafia do lokalizacji 1 - nie kasujemy danych, ktore klient wpisal.
+   */
+  function usunLokalizacje(indeks: number) {
+    const obecne = getValues("lokalizacje");
+    const usunietyNr = Number(obecne[indeks]?.nr);
+    const pozostale = obecne.filter((_, i) => i !== indeks);
+    const mapa = new Map(pozostale.map((l, i) => [Number(l.nr), i + 1]));
+
+    const przepnij = <U extends { lokalizacja: number }>(u: U): U => ({
+      ...u,
+      lokalizacja: Number(u.lokalizacja) === usunietyNr ? 1 : mapa.get(Number(u.lokalizacja)) ?? 1,
+    });
+
+    setValue("sprzet_medyczny", getValues("sprzet_medyczny").map(przepnij), { shouldDirty: true });
+    setValue("elektronika_eei", getValues("elektronika_eei").map(przepnij), { shouldDirty: true });
+    replace(pozostale.map((l, i) => ({ ...l, nr: i + 1 })));
+  }
 
   return (
     <div className="space-y-6">
@@ -283,7 +346,7 @@ function KrokDaneFirmy() {
             <div key={field.id} className="flex items-center justify-between rounded-lg bg-stone-50 px-4 py-2.5">
               <span className="text-sm text-stone-700">Lokalizacja {i + 1}</span>
               {fields.length > 1 && (
-                <button type="button" onClick={() => remove(i)}
+                <button type="button" onClick={() => usunLokalizacje(i)}
                   className="text-xs text-stone-400 hover:text-red-600">
                   Usuń
                 </button>
@@ -406,14 +469,10 @@ function KrokPodsumowanie() {
           <PoleTakNie
             etykieta="Oświadczam, że wszystkie informacje podane we wniosku są zgodne z prawdą i odzwierciedlają rzeczywisty stan faktyczny."
             rejestracja={register("zgoda_prawdziwosc")} />
-          {bledy.zgoda_prawdziwosc?.message && (
-            <p className="komunikat-bledu">{bledy.zgoda_prawdziwosc.message}</p>
-          )}
 
           <PoleTakNie
             etykieta="Wyrażam zgodę na przetwarzanie moich danych osobowych przez Aura Expert sp. z o.o. w celu przygotowania oferty ubezpieczenia, zgodnie z RODO."
             rejestracja={register("zgoda_rodo")} />
-          {bledy.zgoda_rodo?.message && <p className="komunikat-bledu">{bledy.zgoda_rodo.message}</p>}
         </div>
       </Sekcja>
     </div>

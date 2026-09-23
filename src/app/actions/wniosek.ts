@@ -5,8 +5,7 @@ import { redirect } from "next/navigation";
 import { biezacyAdmin } from "@/lib/autoryzacja";
 import { wczytajWniosekZExcela } from "@/lib/excel/parse";
 import type { OstrzezenieImportu } from "@/lib/excel/parse";
-import { pustyWniosek, wniosekDoZlozeniaSchema, wniosekSchema } from "@/lib/schema";
-import type { Wniosek } from "@/lib/schema";
+import { pustyWniosek, wniosekDoZlozeniaSchema, wniosekRoboczySchema } from "@/lib/schema";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { pobierzWniosek, utworzWniosek, zapiszWniosek } from "@/lib/wnioski";
 import { STATUS } from "@/lib/slowniki";
@@ -52,16 +51,19 @@ export async function akcjaNowyWniosek(): Promise<WynikAkcji> {
   redirect(`/wniosek/${token}`);
 }
 
-/** Zapis roboczy. Walidacja luzna - wniosek w trakcie wypelniania ma prawo byc niekompletny. */
+/**
+ * Zapis roboczy. Schemat roboczy nie odrzuca danych - wniosek w trakcie
+ * wypelniania ma prawo byc niekompletny i miec bledy, a klient nie moze
+ * stracic tego, co wpisal. Poprawnosc sprawdza dopiero zlozenie.
+ */
 export async function akcjaZapiszRoboczy(token: string, dane: unknown): Promise<WynikAkcji> {
-  const wynik = wniosekSchema.safeParse(dane);
+  const wynik = wniosekRoboczySchema.safeParse(dane);
 
   if (!wynik.success) {
-    return {
-      ok: false,
-      blad: "Popraw zaznaczone pola, żeby zapisać wersję roboczą.",
-      bledyPol: bledyPol(wynik.error.issues),
-    };
+    // Nie powinno sie zdarzyc - schemat roboczy lapie kazdy blad typu.
+    // Jesli jednak, zostawiamy slad, zamiast gubic dane po cichu.
+    console.error("[akcjaZapiszRoboczy] nieoczekiwany ksztalt danych:", wynik.error.issues.slice(0, 5));
+    return { ok: false, blad: "Nie udało się zapisać — odśwież stronę i spróbuj ponownie." };
   }
 
   try {
@@ -69,6 +71,7 @@ export async function akcjaZapiszRoboczy(token: string, dane: unknown): Promise<
     revalidatePath(`/wniosek/${token}`);
     return { ok: true, komunikat: "Zapisano wersję roboczą." };
   } catch (e) {
+    console.error("[akcjaZapiszRoboczy] blad zapisu:", e);
     return { ok: false, blad: e instanceof Error ? e.message : "Nie udało się zapisać wniosku." };
   }
 }
@@ -86,8 +89,9 @@ export async function akcjaZlozWniosek(token: string, dane: unknown): Promise<Wy
   }
 
   try {
-    await zapiszWniosek(token, wynik.data as Wniosek, { zloz: true });
+    await zapiszWniosek(token, wynik.data, { zloz: true });
   } catch (e) {
+    console.error("[akcjaZlozWniosek] blad zapisu:", e);
     return { ok: false, blad: e instanceof Error ? e.message : "Nie udało się złożyć wniosku." };
   }
 
