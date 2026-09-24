@@ -41,7 +41,7 @@ const PNG_1X1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0l
 
 async function nowaStrona(browser, opcje = {}) {
   const ctx = await browser.newContext({ acceptDownloads: true, locale: "pl-PL", ...opcje });
-  // Grafiki banera app pobiera z ergo.auraexpert.pl (w replice niedostępne) — w przeglądarce podstawiamy obrazek 1×1.
+  // Grafiki banera app pobiera z banery.auraexpert.pl (w replice niedostępne) — w przeglądarce podstawiamy obrazek 1×1.
   await ctx.route(/\/grafika\/[a-z]+\.png$/, (r) => r.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }));
   const page = await ctx.newPage();
   const bledy = [];

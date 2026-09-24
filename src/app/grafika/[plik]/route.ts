@@ -3,7 +3,7 @@ import { BANERY } from "@/lib/email/promo";
 /**
  * Grafiki banera podawane z naszej domeny.
  *
- * Pliki leżą na ergo.auraexpert.pl/banery/, ale obrazek z innej domeny
+ * Pliki serwuje worker `banery` (banery.auraexpert.pl), ale obrazek z innej domeny
  * i z „/banery/” w adresie to typowy cel blokerów reklam — klient widział
  * pustą ramkę. Serwujemy je więc spod /grafika/<nazwa>.png: pobieramy
  * źródło po stronie serwera (z cache Cloudflare na dobę) i oddajemy jako

@@ -1,7 +1,7 @@
 /**
  * Baner utratadochodu.pl — strona „Dziękujemy” po złożeniu wniosku i (opcjonalnie) mail.
  *
- * Grafiki leżą na ergo.auraexpert.pl; przy każdym wyświetleniu losujemy jedną.
+ * Grafiki serwuje worker `banery` (serwisy/banery, banery.auraexpert.pl); przy każdym wyświetleniu losujemy jedną.
  * Nazwa grafiki trafia do utm_term, żeby w analityce było widać, która działa.
  * Wiele programów pocztowych domyślnie blokuje obrazki, dlatego alt jest
  * pełnym komunikatem, a link działa też bez obrazka.
@@ -12,7 +12,7 @@
 export const BANERY = [
   "programista", "balerina", "aktor", "architekt", "dentysta", "przedsiebiorca",
   "nurkowanie", "jacht", "narty", "rodzina", "podroze", "dom",
-].map((nazwa) => ({ nazwa, url: `https://ergo.auraexpert.pl/banery/${nazwa}.png` }));
+].map((nazwa) => ({ nazwa, url: `https://banery.auraexpert.pl/banery/${nazwa}.png` }));
 
 export const PROMO = {
   wMailu: false,
@@ -25,7 +25,7 @@ export type Baner = { obraz: string; href: string; alt: string; szerokosc: numbe
 /**
  * Losowy baner z linkiem oznaczonym UTM dla danego miejsca wyświetlenia.
  * Na stronie grafika idzie z naszej domeny (/grafika/…, patrz app/grafika),
- * w mailu — bezpośrednio z ergo.auraexpert.pl (klient poczty pobiera ją sam).
+ * w mailu — bezpośrednio z banery.auraexpert.pl (klient poczty pobiera ją sam).
  */
 export function losujBaner(zrodlo: "email" | "strona"): Baner {
   const b = BANERY[Math.floor(Math.random() * BANERY.length)];

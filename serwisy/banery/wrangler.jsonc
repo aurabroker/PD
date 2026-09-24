@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // Wspólne banery utratadochodu.pl dla wszystkich serwisów (wnioski, branzowe, maile).
+  "name": "banery",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-22",
+  "rules": [{ "type": "Data", "globs": ["**/*.png"], "fallthrough": false }],
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [{ "pattern": "banery.auraexpert.pl", "custom_domain": true }],
+  "observability": { "enabled": true }
+}
