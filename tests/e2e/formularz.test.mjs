@@ -944,6 +944,21 @@ await uruchom("T21 statystyki: liczby zgodne z bazą", async ({ page }) => {
   }
 }, browser);
 
+// ---------------------------------------------------------------------------
+await uruchom("T22 baner: grafika niedostępna → karta tekstowa z tym samym linkiem", async ({ page, bledy }) => {
+  const id = await zlozonyWniosek(page, "T22 Salon Baner");
+  const token = sql(`select form_token from mienie_wnioski where id='${id}'`);
+  await page.route("https://ergo.auraexpert.pl/**", (r) => r.fulfill({ status: 404, body: "brak" }));
+  await page.goto(`${APP}/wniosek/${token}/zlozony`);
+  const baner = page.locator("a[data-baner]");
+  await page.waitForFunction(() => document.querySelector("a[data-baner]")?.getAttribute("data-baner-stan") === "tekst", null, { timeout: 10000 }).catch(() => {});
+  sprawdz((await baner.getAttribute("data-baner-stan")) === "tekst", "brak grafiki → karta tekstowa zamiast pustej ramki");
+  sprawdz(await baner.getByText("Ubezpieczenie od utraty dochodu").isVisible(), "karta tekstowa widoczna");
+  sprawdz(/^https:\/\/utratadochodu\.pl\/\?utm_source=wnioski/.test((await baner.getAttribute("href")) ?? ""), "karta tekstowa prowadzi do utratadochodu.pl z UTM");
+  // 404 grafiki to celowo wywołany błąd tego scenariusza, nie awaria aplikacji.
+  for (let i = bledy.length - 1; i >= 0; i--) if (/ergo\.auraexpert\.pl|404 \(\)|status of 404/.test(bledy[i])) bledy.splice(i, 1);
+}, browser);
+
 await browser.close();
 
 // ---------------------------------------------------------------------------

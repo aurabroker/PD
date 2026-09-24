@@ -34,6 +34,7 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 | T19 | obsługa wniosku: przejęcie, oferta i polisa z wymaganymi danymi, historia, kafelki, blokada cudzego wniosku |
 | T20 | dezaktywacja agenta: dostęp odcięty od razu, otwarte wnioski wracają do puli, admin nie zablokuje sam siebie |
 | T21 | statystyki: liczby zgodne z bazą, wszystkie okresy |
+| T22 | baner na stronie „Dziękujemy”: gdy grafika się nie wczyta, karta tekstowa z tym samym linkiem |
 
 Korpus złośliwych plików do T14 generuje `tests/e2e/generuj-zlosliwe.mjs`
 (bez zależności, sam z szablonu i wypełnionego wniosku). Można go uruchomić

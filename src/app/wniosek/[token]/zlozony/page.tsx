@@ -3,6 +3,7 @@ import { pobierzWniosek } from "@/lib/wnioski";
 import { zl } from "@/lib/format";
 import { sumaWniosku } from "@/lib/schema";
 import { losujBaner } from "@/lib/email/promo";
+import BanerPromo from "@/components/BanerPromo";
 
 export const dynamic = "force-dynamic";
 
@@ -61,22 +62,7 @@ export default async function StronaZlozony({ params }: { params: Promise<{ toke
         </p>
       </div>
 
-      <a
-        href={baner.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-6 block overflow-hidden rounded-xl border border-stone-200 bg-white transition hover:border-marka-300"
-        data-baner={baner.obraz}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element -- grafika z zewnętrznej domeny, bez optymalizacji Next */}
-        <img
-          src={baner.obraz}
-          alt={baner.alt}
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          className="block h-auto w-full"
-        />
-      </a>
+      <BanerPromo baner={baner} />
     </main>
   );
 }
