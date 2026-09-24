@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { biezacyAdmin } from "@/lib/autoryzacja";
+import { biezacyAdmin, wniosekZTokenu } from "@/lib/autoryzacja";
 import { zweryfikujTurnstile } from "@/lib/turnstile";
 import { weryfikujRegon, type WynikRegon } from "@/lib/regon";
 import { sprawdzPlikXlsx, BladPliku } from "@/lib/excel/bezpieczenstwo";
@@ -11,15 +11,24 @@ import { wczytajWniosekZExcela } from "@/lib/excel/parse";
 import type { OstrzezenieImportu } from "@/lib/excel/parse";
 import { pustyWniosek, wniosekDoZlozeniaSchema, wniosekRoboczySchema } from "@/lib/schema";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { pobierzWniosek, utworzWniosek, zapiszWniosek } from "@/lib/wnioski";
+import { supabaseServer } from "@/lib/supabase/server";
+import { utworzWniosek, zapiszWniosek } from "@/lib/wnioski";
 import { STATUS } from "@/lib/slowniki";
 
 export type WynikAkcji =
   | { ok: true; komunikat?: string }
   | { ok: false; blad: string; bledyPol?: Record<string, string> };
 
-/** Weryfikacja firmy po NIP w bazie REGON (GUS BIR). Wolana z formularza. */
-export async function akcjaWeryfikujRegon(nip: string): Promise<WynikRegon> {
+/**
+ * Weryfikacja firmy po NIP w bazie REGON (GUS BIR). Wolana z formularza.
+ * Wymaga waznego tokenu wniosku roboczego — inaczej kazdy moglby uzywac
+ * naszego klucza GUS jako darmowego posrednika i wyczerpac jego limity.
+ */
+export async function akcjaWeryfikujRegon(token: string, nip: string): Promise<WynikRegon> {
+  const dostep = await wniosekZTokenu(token);
+  if (!dostep?.wniosek || dostep.wniosek.status !== "roboczy") {
+    return { ok: false, blad: "Weryfikacja jest dostępna tylko w trakcie wypełniania wniosku." };
+  }
   return weryfikujRegon(nip);
 }
 
@@ -185,66 +194,31 @@ function bezpiecznaNazwaPliku(nazwa: string): string {
     .trim() || "wniosek.xlsx";
 }
 
-/** Zmiana statusu wniosku w panelu. */
-export async function akcjaZmienStatus(id: string, status: string): Promise<WynikAkcji> {
-  if (!(await biezacyAdmin())) return { ok: false, blad: "Brak uprawnień." };
+/**
+ * Wnioski zalogowanego klienta (widok /moje, logowanie magic linkiem).
+ *
+ * Adres e-mail bierzemy WYLACZNIE z sesji po stronie serwera. Akcja serwerowa
+ * jest publicznym punktem wejscia — gdyby przyjmowala e-mail z parametru,
+ * kazdy moglby pobrac cudze wnioski razem z tokenami dostepu.
+ */
+export async function akcjaMojeWnioski() {
+  const supabase = await supabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) return [];
 
-  if (!(STATUS as readonly string[]).includes(status)) {
-    return { ok: false, blad: "Nieznany status." };
-  }
-
-  const { error } = await supabaseAdmin()
-    .from("mienie_wnioski")
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) return { ok: false, blad: error.message };
-
-  revalidatePath("/admin");
-  revalidatePath(`/admin/wnioski/${id}`);
-  return { ok: true, komunikat: "Status zaktualizowany." };
-}
-
-/** Notatka agenta przy wniosku. */
-export async function akcjaZapiszUwagiAgenta(id: string, uwagi: string): Promise<WynikAkcji> {
-  if (!(await biezacyAdmin())) return { ok: false, blad: "Brak uprawnień." };
-
-  const { error } = await supabaseAdmin()
-    .from("mienie_wnioski")
-    .update({ uwagi_agenta: uwagi.slice(0, 5000), updated_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) return { ok: false, blad: error.message };
-
-  revalidatePath(`/admin/wnioski/${id}`);
-  return { ok: true, komunikat: "Zapisano notatkę." };
-}
-
-/** Przedluzenie wygasajacego linku - agent robi to na prosbe klienta. */
-export async function akcjaPrzedluzLink(id: string): Promise<WynikAkcji> {
-  if (!(await biezacyAdmin())) return { ok: false, blad: "Brak uprawnień." };
-
-  const nowaData = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
-  const { error } = await supabaseAdmin()
-    .from("mienie_wnioski")
-    .update({ token_wygasa: nowaData })
-    .eq("id", id);
-
-  if (error) return { ok: false, blad: error.message };
-
-  revalidatePath(`/admin/wnioski/${id}`);
-  return { ok: true, komunikat: "Link przedłużony o 60 dni." };
-}
-
-/** Dane wniosku dla widoku „moje wnioski" - po zalogowaniu klienta magic linkiem. */
-export async function akcjaMojeWnioski(email: string) {
+  // Dokladne dopasowanie bez rozroznienia wielkosci liter: `_` i `%` w adresie
+  // nie moga dzialac jak wzorce ilike.
+  const wzorzec = user.email.replace(/[\\%_]/g, (z) => `\\${z}`);
   const { data } = await supabaseAdmin()
     .from("mienie_wnioski")
-    .select("id, nr_referencyjny, nazwa_firmy, status, created_at, updated_at, form_token, suma_lacznie")
-    .ilike("email_kontaktowy", email)
+    .select("id, nr_referencyjny, nazwa_firmy, status, created_at, updated_at, form_token, suma_lacznie, email_kontaktowy")
+    .ilike("email_kontaktowy", wzorzec)
     .order("updated_at", { ascending: false });
 
-  return data ?? [];
+  // PostgREST zamienia `*` na wzorzec — ostateczne porownanie robimy tutaj.
+  const email = user.email.toLowerCase();
+  return (data ?? []).filter((w) => (w.email_kontaktowy ?? "").toLowerCase() === email);
 }
 
-export { pobierzWniosek };

@@ -29,6 +29,11 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 | T14 | import złośliwych plików: bomby dekompresyjne, XXE/billion laughs, makra i obiekty OLE, formuły w treści, podmienione rozszerzenie, uszkodzone i za duże archiwum |
 | T15 | weryfikacja firmy w REGON: przycisk → akcja → wynik lub czytelny błąd, bez awarii formularza |
 | T16 | przerobiony szablon (podmieniona etykieta, formuła z linkiem, ukryta treść): import przechodzi, w bazie 3 różnice dla agenta |
+| T17 | panel: logowanie admina, kafelki zgodne z bazą, zakładki, Health czerwony przy brakującej konfiguracji |
+| T18 | agenci: dodanie agenta, link do hasła (jednorazowy), ustawienie hasła, rola agenta bez Health/Agenci (też ręcznie wpisany adres i API) |
+| T19 | obsługa wniosku: przejęcie, oferta i polisa z wymaganymi danymi, historia, kafelki, blokada cudzego wniosku |
+| T20 | dezaktywacja agenta: dostęp odcięty od razu, otwarte wnioski wracają do puli, admin nie zablokuje sam siebie |
+| T21 | statystyki: liczby zgodne z bazą, wszystkie okresy |
 
 Korpus złośliwych plików do T14 generuje `tests/e2e/generuj-zlosliwe.mjs`
 (bez zależności, sam z szablonu i wypełnionego wniosku). Można go uruchomić
@@ -46,8 +51,11 @@ Node 22, Playwright z Chromium.
 # 1. Baza (Postgres na porcie 54322)
 createdb -h 127.0.0.1 -p 54322 -U postgres beauty
 psql -h 127.0.0.1 -p 54322 -U postgres -d beauty -f tests/e2e/replika-schemat.sql
+# migracje nowsze niż replika-schemat.sql — te same pliki, co na produkcji
+psql -h 127.0.0.1 -p 54322 -U postgres -d beauty -f supabase/migrations/20260924_mienie_panel_agentow.sql
 
-# 2. PostgREST i proxy udające adres Supabase
+# 2. PostgREST i proxy udające adres Supabase (REST + atrapa logowania GoTrue:
+#    hasło, sesja, zaproszenie z jednorazowym linkiem — panel agenta w T17–T21)
 postgrest tests/e2e/postgrest.conf &
 node tests/e2e/proxy-supabase.mjs &
 

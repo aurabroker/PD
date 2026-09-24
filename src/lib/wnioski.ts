@@ -4,6 +4,7 @@ import { doWierszaWniosku, doWierszyLokalizacji, zWierszy } from "./mapowanie";
 import { znormalizujNumeracje } from "./schema";
 import type { WniosekRoboczy } from "./schema";
 import type { Zgodnosc } from "./excel/zgodnosc";
+import { zapiszHistorie } from "./historia";
 
 /**
  * Token dostepu do wniosku. Zachowuje format uzywany przez wczesniejsze wnioski
@@ -115,9 +116,11 @@ export async function zapiszWniosek(
   }
 
   const aktualizacja: Record<string, unknown> = doWierszaWniosku(dane);
+  const teraz = new Date().toISOString();
   if (opcje.zloz) {
     aktualizacja.status = "zlozony";
-    aktualizacja.wyslano_at = new Date().toISOString();
+    aktualizacja.wyslano_at = teraz;
+    aktualizacja.status_zmieniony_at = teraz;
   }
 
   const { error } = await supabase
@@ -128,6 +131,9 @@ export async function zapiszWniosek(
   if (error) throw new Error(`Nie udało się zapisać wniosku: ${error.message}`);
 
   await zapiszLokalizacje(dane, istniejacy.id, istniejacy.company_id, token);
+  if (opcje.zloz) {
+    await zapiszHistorie(istniejacy.id, null, "zlozenie", { status: "zlozony" });
+  }
   return { id: istniejacy.id };
 }
 

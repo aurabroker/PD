@@ -41,7 +41,7 @@ async function nowaStrona(browser, opcje = {}) {
   const ctx = await browser.newContext({ acceptDownloads: true, locale: "pl-PL", ...opcje });
   const page = await ctx.newPage();
   const bledy = [];
-  page.on("pageerror", (e) => bledy.push(`pageerror: ${e.message}`));
+  page.on("pageerror", (e) => bledy.push(`pageerror na ${page.url().replace(APP, "")}: ${e.message}`));
   page.on("console", (m) => { if (m.type() === "error") bledy.push(`console.error: ${m.text()}`); });
   page.on("response", (r) => {
     if (r.status() >= 500) bledy.push(`HTTP ${r.status()} ${r.request().method()} ${r.url()}`);
@@ -658,6 +658,223 @@ await uruchom("T16 przerobiony szablon: import przechodzi, agent widzi różnice
   sprawdz(/B7.*Numer rachunku/.test(roznice), "różnica: podmieniona etykieta NIP", roznice);
   sprawdz(/C13.*HYPERLINK/.test(roznice), "różnica: formuła z linkiem w polu e-mail", roznice);
   sprawdz(/H40.*poza polami/.test(roznice), "różnica: ukryta treść poza polami formularza", roznice);
+}, browser);
+
+// ===========================================================================
+// PANEL AGENTA — logowanie przez atrapę GoTrue w tests/e2e/proxy-supabase.mjs
+// ===========================================================================
+const ADMIN = { id: "00000000-0000-4000-8000-00000000a001", email: "admin@e2e.local", haslo: "Haslo-Admina-123" };
+sql(`insert into auth.users (id, email, encrypted_password) values ('${ADMIN.id}', '${ADMIN.email}', '${ADMIN.haslo}')
+     on conflict (email) do update set encrypted_password = excluded.encrypted_password`);
+sql(`insert into public.mienie_agenci (user_id, email, imie_nazwisko, rola, aktywny)
+     values ('${ADMIN.id}', '${ADMIN.email}', 'Ada Administratorka', 'admin', true)
+     on conflict (user_id) do update set rola = 'admin', aktywny = true`);
+
+async function zaloguj(page, email, haslo) {
+  await page.goto(APP + "/login");
+  await page.fill("#email", email);
+  await page.fill("#haslo", haslo);
+  await page.getByRole("button", { name: "Zaloguj się" }).click();
+  await page.waitForURL(/\/admin$/, { timeout: 20000 });
+}
+const kafelek = async (page, etykieta) =>
+  Number((await page.locator(`[data-kafelek="${etykieta}"] .text-2xl`).innerText()).replace(/\D/g, ""));
+
+/** Wniosek złożony, nieprzypisany — przygotowany przez UI, złożenie ustawione w bazie. */
+async function zlozonyWniosek(page, nazwa) {
+  const token = await nowyWniosek(page);
+  sql(`update mienie_wnioski set status='zlozony', wyslano_at=now(), status_zmieniony_at=now(), nazwa_firmy='${nazwa}',
+       przypisany_agent=null where form_token='${token}'`);
+  return sql(`select id from mienie_wnioski where form_token='${token}'`);
+}
+
+let agentT18 = null; // { email, haslo, id } — używany w T19 i T20
+
+// ---------------------------------------------------------------------------
+await uruchom("T17 panel: logowanie admina, liczniki zgodne z bazą, zakładki i Health", async ({ page }) => {
+  await zaloguj(page, ADMIN.email, ADMIN.haslo);
+  const zlozoneDb = Number(sql(`select count(*) from mienie_wnioski where status <> 'roboczy'`));
+  const czekajaDb = Number(sql(`select count(*) from mienie_wnioski where status = 'zlozony'`));
+  const roboczeDb = Number(sql(`select count(*) from mienie_wnioski where status = 'roboczy'`));
+  sprawdz((await kafelek(page, "Wnioski złożone")) === zlozoneDb, "kafelek „Wnioski złożone” = baza", `${await kafelek(page, "Wnioski złożone")} vs ${zlozoneDb}`);
+  sprawdz((await kafelek(page, "Czekają na agenta")) === czekajaDb, "kafelek „Czekają na agenta” = baza");
+  sprawdz((await kafelek(page, "W trakcie wypełniania")) === roboczeDb, "kafelek „W trakcie wypełniania” = baza");
+
+  const nav = page.getByRole("navigation", { name: "Zakładki panelu" });
+  for (const z of ["Panel agenta", "Health", "Statystyki", "Agenci"]) {
+    sprawdz(await nav.getByRole("link", { name: new RegExp(z) }).isVisible(), `admin widzi zakładkę ${z}`);
+  }
+  // Wskaźnik Health: w replice brak kluczy Turnstile/GUS/Resend → musi świecić na czerwono.
+  await page.waitForFunction(() => document.querySelector("[data-stan-zdrowia]")?.getAttribute("data-stan-zdrowia") !== "sprawdzam", null, { timeout: 30000 });
+  sprawdz((await page.locator("[data-stan-zdrowia]").getAttribute("data-stan-zdrowia")) === "blad", "Health czerwony, gdy brakuje konfiguracji integracji");
+
+  await page.goto(APP + "/admin/health");
+  sprawdz((await page.locator("[data-stan-ogolny]").getAttribute("data-stan-ogolny")) === "blad", "strona Health: stan ogólny „wymaga interwencji”");
+  const stan = async (id) => page.locator(`[data-sprawdzenie="${id}"]`).getAttribute("data-stan");
+  sprawdz((await stan("baza")) === "ok", "Health: baza danych działa");
+  sprawdz((await stan("schemat")) === "ok", "Health: migracje zastosowane");
+  sprawdz((await stan("rls")) === "ok", "Health: dane zamknięte przed kluczem anon");
+  sprawdz((await stan("resend")) === "blad", "Health: brak klucza Resend wykryty");
+
+  // Podsumowanie filtra z kafelka prowadzi do tej samej liczby wniosków
+  await page.goto(APP + "/admin?status=zlozony");
+  sprawdz((await page.locator("tbody tr").count()) === Math.min(czekajaDb, 200), "kafelek → lista pokazuje te same wnioski");
+}, browser);
+
+// ---------------------------------------------------------------------------
+await uruchom("T18 agenci: dodanie agenta, ustawienie hasła z linku, rola bez uprawnień admina", async ({ page, ctx }) => {
+  await zaloguj(page, ADMIN.email, ADMIN.haslo);
+  await page.goto(APP + "/admin/agenci");
+  const email = `agent-${Date.now()}@e2e.local`;
+  const form = page.getByRole("form", { name: "Dodaj agenta" });
+  await form.getByLabel("Imię i nazwisko").fill("Jan Testowy");
+  await form.getByLabel("E-mail").fill(email);
+  await form.getByRole("button", { name: "Dodaj" }).click();
+  const link = await form.locator("[data-link-hasla]").inputValue({ timeout: 20000 });
+  sprawdz(/\/auth\/ustaw-haslo\?token_hash=.+&type=invite/.test(link), "po dodaniu widać jednorazowy link do hasła", link);
+  const wiersz = sql(`select a.rola || '|' || a.aktywny || '|' || (u.id is not null) from mienie_agenci a join auth.users u on u.id=a.user_id where a.email='${email}'`);
+  sprawdz(wiersz === "agent|true|true", "DB: konto logowania + wpis agenta z rolą agent", wiersz);
+  const mail = sql(`select status from mienie_emaile where do_kogo='${email}' order by id desc limit 1`);
+  sprawdz(mail === "blad", "DB: nieudana wysyłka zaproszenia (brak Resend w replice) zapisana w dzienniku", mail);
+
+  // Agent ustawia hasło w osobnej przeglądarce
+  const ctxAgenta = await browser.newContext({ locale: "pl-PL" });
+  const a = await ctxAgenta.newPage();
+  await a.goto(link);
+  await a.fill("#haslo", "krotkie");
+  await a.fill("#powtorz", "krotkie");
+  await a.getByRole("button", { name: "Ustaw hasło" }).click();
+  sprawdz(await a.getByText(/co najmniej 10 znaków/).isVisible().catch(() => false) ||
+          await a.locator("#haslo:invalid").count() > 0, "za krótkie hasło odrzucone");
+  const haslo = "Haslo-Agenta-456";
+  await a.fill("#haslo", haslo);
+  await a.fill("#powtorz", haslo);
+  await a.getByRole("button", { name: "Ustaw hasło" }).click();
+  await a.waitForURL(/\/admin$/, { timeout: 20000 });
+  sprawdz(true, "po ustawieniu hasła agent trafia prosto do panelu");
+  const nav = a.getByRole("navigation", { name: "Zakładki panelu" });
+  sprawdz(!(await nav.getByRole("link", { name: /Health/ }).isVisible().catch(() => false)), "agent nie widzi zakładki Health");
+  sprawdz(!(await nav.getByRole("link", { name: /Agenci/ }).isVisible().catch(() => false)), "agent nie widzi zakładki Agenci");
+  await a.goto(APP + "/admin/agenci");
+  sprawdz(!/\/admin\/agenci/.test(a.url()), "agent wpisujący /admin/agenci ręcznie zostaje przekierowany", a.url());
+  const api = await a.request.get(APP + "/api/admin/health");
+  sprawdz(api.status() === 401, "agent dostaje 401 z /api/admin/health", String(api.status()));
+
+  // Link jest jednorazowy
+  const c = await (await browser.newContext()).newPage();
+  await c.goto(link);
+  await c.fill("#haslo", "Inne-Haslo-789");
+  await c.fill("#powtorz", "Inne-Haslo-789");
+  await c.getByRole("button", { name: "Ustaw hasło" }).click();
+  const odrzucony = await c.getByText(/wygasł albo został już użyty/).waitFor({ timeout: 15000 }).then(() => true, () => false);
+  sprawdz(odrzucony, "ponowne użycie linku odrzucone");
+  sprawdz(/ustaw-haslo/.test(c.url()), "ponowne użycie linku nie loguje do panelu", c.url());
+
+  // Nowe hasło działa w logowaniu
+  const d = await (await browser.newContext({ locale: "pl-PL" })).newPage();
+  await zaloguj(d, email, haslo);
+  sprawdz(/\/admin$/.test(d.url()), "agent loguje się ustawionym hasłem");
+  agentT18 = { email, haslo, id: sql(`select user_id from mienie_agenci where email='${email}'`) };
+  await ctxAgenta.close();
+}, browser);
+
+// ---------------------------------------------------------------------------
+await uruchom("T19 obsługa wniosku: przejęcie, status z wymaganymi danymi, historia, liczniki", async ({ page }) => {
+  if (!agentT18) return sprawdz(false, "T19 wymaga agenta z T18");
+  const idWniosku = await zlozonyWniosek(page, "T19 Salon Obsługi");
+  const polisyPrzed = Number(sql(`select count(*) from mienie_wnioski where status='polisa'`));
+
+  await zaloguj(page, agentT18.email, agentT18.haslo);
+  await page.goto(`${APP}/admin/wnioski/${idWniosku}`);
+  await page.getByRole("button", { name: "Przejmij wniosek" }).click();
+  await page.getByText("Wniosek przypisany.").waitFor({ timeout: 15000 });
+  sprawdz(sql(`select przypisany_agent from mienie_wnioski where id='${idWniosku}'`) === agentT18.id, "DB: agent przejął wniosek");
+
+  // Oferta bez danych → odrzucona
+  await page.selectOption("#status", "wyceniony");
+  await page.getByRole("button", { name: /Zmień na: Oferta przedstawiona/ }).click();
+  await page.getByText(/Podaj towarzystwo/).waitFor({ timeout: 15000 });
+  sprawdz(sql(`select status from mienie_wnioski where id='${idWniosku}'`) === "zlozony", "oferta bez towarzystwa i składki nie zmienia statusu");
+
+  await page.getByLabel("Towarzystwo").fill("PZU S.A.");
+  await page.getByLabel("Składka roczna oferty").fill("4200");
+  await page.getByRole("button", { name: /Zmień na: Oferta przedstawiona/ }).click();
+  await page.getByText("Status: Oferta przedstawiona.").waitFor({ timeout: 15000 });
+  const oferta = sql(`select status || '|' || oferta_towarzystwo || '|' || oferta_skladka from mienie_wnioski where id='${idWniosku}'`);
+  sprawdz(oferta === "wyceniony|PZU S.A.|4200", "DB: oferta zapisana z towarzystwem i składką", oferta);
+
+  await page.selectOption("#status", "polisa");
+  await page.getByLabel("Numer polisy").fill("PZU/123/2026");
+  await page.getByLabel("Składka roczna polisy").fill("4100");
+  await page.getByLabel("Ochrona od").fill("2026-10-01");
+  await page.getByLabel("Ochrona do").fill("2027-09-30");
+  await page.getByRole("button", { name: /Zmień na: Polisa zawarta/ }).click();
+  await page.getByText("Status: Polisa zawarta.").waitFor({ timeout: 15000 });
+  const polisa = sql(`select status || '|' || polisa_numer || '|' || polisa_skladka || '|' || polisa_do from mienie_wnioski where id='${idWniosku}'`);
+  sprawdz(polisa === "polisa|PZU/123/2026|4100|2027-09-30", "DB: polisa zapisana z numerem, składką i okresem", polisa);
+
+  const historia = sql(`select string_agg(zdarzenie || ':' || coalesce(szczegoly->>'na',''), ',' order by id) from mienie_historia where wniosek_id='${idWniosku}'`);
+  sprawdz(historia === `przydzial:${agentT18.id},status:wyceniony,status:polisa`, "DB: historia — przydział i dwie zmiany statusu", historia);
+  await page.reload();
+  sprawdz(await page.getByRole("region", { name: "Historia wniosku" }).getByText(/Oferta przedstawiona → Polisa zawarta/).isVisible(), "historia widoczna na stronie wniosku");
+
+  await page.goto(APP + "/admin");
+  sprawdz((await kafelek(page, "Polisy zawarte")) === polisyPrzed + 1, "kafelek „Polisy zawarte” wzrósł o 1");
+
+  // Agent nie zmienia cudzego wniosku: admin przypisuje drugi wniosek sobie
+  const cudzy = await zlozonyWniosek(page, "T19 Cudzy Salon");
+  sql(`update mienie_wnioski set przypisany_agent='${ADMIN.id}' where id='${cudzy}'`);
+  await page.goto(`${APP}/admin/wnioski/${cudzy}`);
+  sprawdz(await page.getByText(/prowadzi inny agent/).isVisible(), "agent widzi, że cudzy wniosek prowadzi ktoś inny");
+  sprawdz(await page.locator("#status").isDisabled(), "zmiana statusu cudzego wniosku zablokowana");
+}, browser);
+
+// ---------------------------------------------------------------------------
+await uruchom("T20 dezaktywacja agenta: dostęp odcięty, otwarte wnioski wracają do puli", async ({ page }) => {
+  if (!agentT18) return sprawdz(false, "T20 wymaga agenta z T18");
+  const otwarty = await zlozonyWniosek(page, "T20 Salon Agenta");
+  sql(`update mienie_wnioski set przypisany_agent='${agentT18.id}' where id='${otwarty}'`);
+
+  const ctxAgenta = await browser.newContext({ locale: "pl-PL" });
+  const a = await ctxAgenta.newPage();
+  await zaloguj(a, agentT18.email, agentT18.haslo);
+
+  await zaloguj(page, ADMIN.email, ADMIN.haslo);
+  await page.goto(APP + "/admin/agenci");
+  page.once("dialog", (d) => d.accept());
+  await page.locator(`[data-agent="${agentT18.email}"]`).getByRole("button", { name: "Dezaktywuj" }).click();
+  await page.getByText(/Agent zdezaktywowany/).waitFor({ timeout: 15000 });
+
+  sprawdz(sql(`select aktywny from mienie_agenci where user_id='${agentT18.id}'`) === "f", "DB: agent nieaktywny");
+  sprawdz(sql(`select coalesce(przypisany_agent::text,'NULL') from mienie_wnioski where id='${otwarty}'`) === "NULL", "otwarty wniosek agenta wrócił do puli");
+  const polisaZostaje = sql(`select count(*) from mienie_wnioski where przypisany_agent='${agentT18.id}' and status='polisa'`);
+  sprawdz(Number(polisaZostaje) >= 1, "zamknięta polisa zostaje przypisana do agenta (do statystyk)", polisaZostaje);
+
+  await a.goto(APP + "/admin");
+  sprawdz(/\/login/.test(a.url()), "zalogowany wcześniej agent przy następnym kliknięciu trafia na logowanie", a.url());
+  await ctxAgenta.close();
+
+  // Ostatni admin nie może odebrać sobie roli ani się dezaktywować
+  const mojWiersz = page.locator(`[data-agent="${ADMIN.email}"]`);
+  sprawdz(await mojWiersz.getByLabel("Rola agenta").isDisabled(), "admin nie zmienia roli samemu sobie");
+  sprawdz(!(await mojWiersz.getByRole("button", { name: "Dezaktywuj" }).isVisible().catch(() => false)), "admin nie może dezaktywować siebie");
+}, browser);
+
+// ---------------------------------------------------------------------------
+await uruchom("T21 statystyki: liczby zgodne z bazą", async ({ page }) => {
+  await zaloguj(page, ADMIN.email, ADMIN.haslo);
+  await page.goto(APP + "/admin/statystyki?okres=wszystko");
+  const zlozone = Number(sql(`select count(*) from mienie_wnioski where status <> 'roboczy'`));
+  const polisy = Number(sql(`select count(*) from mienie_wnioski where status = 'polisa'`));
+  sprawdz((await kafelek(page, "Wnioski złożone")) === zlozone, "Statystyki: wnioski złożone = baza", `${await kafelek(page, "Wnioski złożone")} vs ${zlozone}`);
+  sprawdz((await kafelek(page, "Polisy zawarte")) === polisy, "Statystyki: polisy = baza");
+  for (const t of ["Suma ubezpieczenia wg kategorii", "Zakres ubezpieczenia", "Trend — ostatnie 12 miesięcy", "Ryzyko", "Obecne ubezpieczenie klientów"]) {
+    sprawdz(await page.getByRole("heading", { name: t }).isVisible(), `sekcja „${t}” widoczna`);
+  }
+  for (const o of ["30", "90", "365"]) {
+    await page.goto(`${APP}/admin/statystyki?okres=${o}`);
+    sprawdz(await page.getByRole("heading", { name: "Statystyki" }).isVisible(), `okres ${o} dni renderuje się`);
+  }
 }, browser);
 
 await browser.close();

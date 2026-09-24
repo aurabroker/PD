@@ -9,9 +9,12 @@ import type { DaneRegon } from "@/lib/regon";
  * forma prawna, KRS, PKD, status) i jednym kliknięciem uzupełnia nimi formularz.
  */
 export default function WeryfikacjaRegon({
+  token,
   pobierzNip,
   onZastosuj,
 }: {
+  /** Token wniosku — bez niego akcja odmawia (klucz GUS nie jest publicznym pośrednikiem). */
+  token: string;
   pobierzNip: () => string;
   /** Zwraca listę uzupełnionych pól — pokazujemy ją klientowi. */
   onZastosuj: (dane: DaneRegon) => string[];
@@ -27,7 +30,7 @@ export default function WeryfikacjaRegon({
     setUzupelnione(null);
     start(async () => {
       try {
-        const wynik = await akcjaWeryfikujRegon(pobierzNip());
+        const wynik = await akcjaWeryfikujRegon(token, pobierzNip());
         if (!wynik.ok) {
           setBlad(wynik.blad);
           return;

@@ -179,7 +179,7 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu, nr
         <NawigacjaKrokow kroki={kroki} aktywny={krok} naKrok={setKrok} />
 
         <div className="mt-6">
-          {aktualny.klucz === "firma" && <KrokDaneFirmy />}
+          {aktualny.klucz === "firma" && <KrokDaneFirmy token={token} />}
           {aktualny.klucz.startsWith("lok-") && (
             <KrokLokalizacja indeks={Number(aktualny.klucz.split("-")[1])} />
           )}
@@ -277,7 +277,7 @@ function NawigacjaKrokow({
   );
 }
 
-function KrokDaneFirmy() {
+function KrokDaneFirmy({ token }: { token: string }) {
   const { register, control, formState, getValues, setValue } = useFormContext<Wniosek>();
   const bledy = formState.errors;
   const { fields, append, replace } = useFieldArray({ control, name: "lokalizacje" });
@@ -312,6 +312,7 @@ function KrokDaneFirmy() {
             rejestracja={register("nazwa_firmy")} />
           <Pole etykieta="NIP" podpowiedz="10 cyfr" blad={bledy.nip} rejestracja={register("nip")} />
           <WeryfikacjaRegon
+            token={token}
             pobierzNip={() => getValues("nip")}
             onZastosuj={(dane) => {
               const opcje = { shouldDirty: true, shouldValidate: true } as const;

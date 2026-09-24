@@ -27,7 +27,7 @@ export default function StronaMojeWnioski() {
         return;
       }
       setEmail(data.user.email);
-      setWnioski(await akcjaMojeWnioski(data.user.email));
+      setWnioski(await akcjaMojeWnioski());
       setStan("lista");
     });
   }, []);
@@ -123,7 +123,7 @@ export default function StronaMojeWnioski() {
                 <p className="text-sm text-stone-600">{w.nazwa_firmy}</p>
                 <p className="mt-1 text-xs text-stone-400">
                   {STATUS_ETYKIETY[w.status as keyof typeof STATUS_ETYKIETY] ?? w.status} · zmieniony{" "}
-                  {new Date(w.updated_at).toLocaleDateString("pl-PL")}
+                  {new Date(w.updated_at).toLocaleDateString("pl-PL", { timeZone: "Europe/Warsaw" })}
                 </p>
               </div>
               <div className="flex gap-2">

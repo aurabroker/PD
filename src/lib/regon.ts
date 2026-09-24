@@ -406,3 +406,33 @@ export async function weryfikujRegon(nipSurowy: string): Promise<WynikRegon> {
     }
   }
 }
+
+/**
+ * Test połączenia dla zakładki Health: samo Zaloguj/Wyloguj, bez wyszukiwania.
+ * GUS przy złym kluczu zwraca pustą sesję, a nie błąd HTTP — sprawdzamy sid.
+ */
+export async function sprawdzPolaczenieGus(): Promise<{ ok: boolean; test: boolean; opis: string }> {
+  const { klucz, endpoint, test } = konfiguracja();
+  try {
+    const odp = await wywolaj(
+      endpoint,
+      `${AKCJA}/Zaloguj`,
+      `<ns:Zaloguj><ns:pKluczUzytkownika>${esc(klucz)}</ns:pKluczUzytkownika></ns:Zaloguj>`,
+    );
+    const sid = tag(odp, "ZalogujResult");
+    if (!sid) return { ok: false, test, opis: "GUS odrzucił klucz (pusta sesja) — sprawdź GUS_BIR_KEY." };
+    await wywolaj(
+      endpoint,
+      `${AKCJA}/Wyloguj`,
+      `<ns:Wyloguj><ns:pIdentyfikatorSesji>${esc(sid)}</ns:pIdentyfikatorSesji></ns:Wyloguj>`,
+      sid,
+    ).catch(() => {});
+    return {
+      ok: true,
+      test,
+      opis: test ? "Działa, ale na rejestrze TESTOWYM — brak GUS_BIR_KEY." : "Rejestr produkcyjny, logowanie kluczem działa.",
+    };
+  } catch (e) {
+    return { ok: false, test, opis: `Brak połączenia z GUS: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}

@@ -109,19 +109,57 @@ export const STATUS = [
   "w_ocenie",
   "wyceniony",
   "zaakceptowany",
+  "polisa",
+  "rezygnacja",
   "odrzucony",
   "archiwalny",
 ] as const;
 
-export const STATUS_ETYKIETY: Record<(typeof STATUS)[number], string> = {
+export type Status = (typeof STATUS)[number];
+
+/**
+ * Lejek: roboczy → złożony → w ocenie → oferta → akceptacja → polisa.
+ * Wyjścia z lejka: rezygnacja klienta, odrzucenie (odmowa TU/agenta), archiwum.
+ */
+export const STATUS_ETYKIETY: Record<Status, string> = {
   roboczy: "Roboczy",
   zlozony: "Złożony",
   w_ocenie: "W ocenie",
-  wyceniony: "Wyceniony",
-  zaakceptowany: "Zaakceptowany",
+  wyceniony: "Oferta przedstawiona",
+  zaakceptowany: "Oferta zaakceptowana",
+  polisa: "Polisa zawarta",
+  rezygnacja: "Rezygnacja klienta",
   odrzucony: "Odrzucony",
   archiwalny: "Archiwalny",
 };
+
+/** Kolory znacznika statusu (Tailwind). */
+export const STATUS_KOLORY: Record<Status, string> = {
+  roboczy: "bg-stone-100 text-stone-600",
+  zlozony: "bg-blue-50 text-blue-700",
+  w_ocenie: "bg-amber-50 text-amber-800",
+  wyceniony: "bg-violet-50 text-violet-700",
+  zaakceptowany: "bg-teal-50 text-teal-700",
+  polisa: "bg-emerald-50 text-emerald-700",
+  rezygnacja: "bg-orange-50 text-orange-700",
+  odrzucony: "bg-red-50 text-red-700",
+  archiwalny: "bg-stone-100 text-stone-400",
+};
+
+/** Statusy „w toku” — wniosek czeka na ruch agenta albo klienta. */
+export const STATUSY_OTWARTE: readonly Status[] = ["zlozony", "w_ocenie", "wyceniony", "zaakceptowany"];
+
+/** Statusy, w których oferta została już przedstawiona klientowi. */
+export const STATUSY_Z_OFERTA: readonly Status[] = ["wyceniony", "zaakceptowany", "polisa"];
+
+export const POWODY_REZYGNACJI = [
+  "Za wysoka składka",
+  "Wybór oferty innego pośrednika",
+  "Przedłużenie obecnej polisy",
+  "Brak kontaktu z klientem",
+  "Rezygnacja z ubezpieczenia",
+  "Inny powód",
+] as const;
 
 /** Pozycje sum ubezpieczenia - wspolna kolejnosc dla formularza, Excela i podsumowania. */
 export const POZYCJE_SUM = [

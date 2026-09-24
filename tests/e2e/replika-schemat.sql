@@ -2,6 +2,18 @@
 -- odtworzona z information_schema/pg_constraint/pg_indexes z 2026-09-23.
 create extension if not exists pgcrypto;
 
+-- Minimalny odpowiednik schematu auth Supabase: tyle, ile potrzebuje atrapa
+-- logowania w tests/e2e/proxy-supabase.mjs i klucze obce z migracji.
+-- (encrypted_password trzyma tu hasło jawnym tekstem — wyłącznie w replice testowej.)
+create schema if not exists auth;
+create table auth.users (
+  id uuid primary key default gen_random_uuid(),
+  email text unique not null,
+  encrypted_password text,
+  created_at timestamptz not null default now(),
+  last_sign_in_at timestamptz
+);
+
 create table public.crm_companies (id serial primary key, nazwa text);
 
 create table public.mienie_wnioski (
@@ -94,6 +106,10 @@ grant anon, authenticated, service_role to authenticator;
 grant usage on schema public to anon, authenticated, service_role;
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
+-- Jak w Supabase: nowe tabele w public dostają uprawnienia dla wszystkich ról
+-- (dostęp ogranicza RLS). Migracje same odbierają je anon/authenticated.
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 
 -- RLS jak na produkcji po lockdownie: anon nie ma zadnej polityki
 alter table public.mienie_wnioski enable row level security;

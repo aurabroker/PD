@@ -4,6 +4,9 @@ import { kontrolaSpojnosci, sumaLokalizacji, sumaWniosku } from "@/lib/schema";
 import { zl } from "@/lib/format";
 import { POZYCJE_SUM, STATUS_ETYKIETY } from "@/lib/slowniki";
 import PanelAgenta from "@/components/PanelAgenta";
+import { biezacyAgent } from "@/lib/autoryzacja";
+import { historiaWniosku, type WpisHistorii } from "@/lib/historia";
+import { nazwaAgenta, pobierzAgentow, type AgentSkrot } from "@/lib/statystyki";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +16,8 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
   if (!wynik) notFound();
 
   const { meta, dane } = wynik;
+  const [sesja, agenci, historia] = await Promise.all([biezacyAgent(), pobierzAgentow(), historiaWniosku(meta.id)]);
+  const poId = new Map(agenci.map((a) => [a.user_id, a]));
   const kontrola = kontrolaSpojnosci(dane);
   const rozbieznosci = kontrola.filter((k) => !k.zgodnyMedyczny || !k.zgodnyEei);
 
@@ -228,6 +233,8 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
               )}
             </Karta>
           )}
+
+          <Historia wpisy={historia} agenci={poId} />
         </div>
 
         <PanelAgenta
@@ -239,6 +246,18 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
           zrodlo={meta.zrodlo}
           importPlik={meta.import_plik}
           zgodnosc={meta.import_zgodnosc ?? null}
+          przypisanyAgent={meta.przypisany_agent ?? null}
+          agenci={agenci.filter((a) => a.aktywny).map((a) => ({ user_id: a.user_id, nazwa: nazwaAgenta(a) }))}
+          ja={{ user_id: sesja!.agent.user_id, admin: sesja!.agent.rola === "admin" }}
+          oferta={{
+            oferta_towarzystwo: meta.oferta_towarzystwo ?? null,
+            oferta_skladka: meta.oferta_skladka ?? null,
+            polisa_numer: meta.polisa_numer ?? null,
+            polisa_skladka: meta.polisa_skladka ?? null,
+            polisa_od: meta.polisa_od ?? null,
+            polisa_do: meta.polisa_do ?? null,
+            rezygnacja_powod: meta.rezygnacja_powod ?? null,
+          }}
           utworzony={meta.created_at}
           wyslany={meta.wyslano_at}
           zakres={dane.zakres}
@@ -315,5 +334,50 @@ function TabelaSprzetu({
         </tr>
       </tfoot>
     </table>
+  );
+}
+
+/** Oś zdarzeń wniosku: złożenie, zmiany statusu, przydziały — kto i kiedy. */
+function Historia({ wpisy, agenci }: { wpisy: WpisHistorii[]; agenci: Map<string, AgentSkrot> }) {
+  if (wpisy.length === 0) return null;
+  const kto = (id: string | null) => (id ? nazwaAgenta(agenci.get(id)) : "klient");
+  const etykieta = (s: unknown) => STATUS_ETYKIETY[s as keyof typeof STATUS_ETYKIETY] ?? String(s ?? "—");
+  const opis = (w: WpisHistorii) => {
+    const d = w.szczegoly as Record<string, unknown>;
+    switch (w.zdarzenie) {
+      case "zlozenie":
+        return "Klient złożył wniosek";
+      case "status": {
+        const extra = [
+          d.oferta_towarzystwo && `${d.oferta_towarzystwo}`,
+          d.oferta_skladka && `składka ${zl(Number(d.oferta_skladka))}`,
+          d.polisa_numer && `polisa ${d.polisa_numer}`,
+          d.polisa_skladka && `składka ${zl(Number(d.polisa_skladka))}`,
+          d.rezygnacja_powod && `powód: ${d.rezygnacja_powod}`,
+        ].filter(Boolean);
+        return `Status: ${etykieta(d.z)} → ${etykieta(d.na)}${extra.length ? ` (${extra.join(", ")})` : ""}`;
+      }
+      case "przydzial":
+        return d.na ? `Przypisano: ${kto(String(d.na))}${d.przejecie ? " (przejęcie przy obsłudze)" : ""}` : "Zwrócono do puli";
+      default:
+        return w.zdarzenie;
+    }
+  };
+
+  return (
+    <section className="rounded-xl border border-stone-200 bg-white p-6" aria-label="Historia wniosku">
+      <h2 className="text-base font-semibold">Historia</h2>
+      <ol className="mt-3 space-y-2 text-sm">
+        {wpisy.map((w) => (
+          <li key={w.id} className="flex flex-wrap gap-x-3 border-l-2 border-stone-200 pl-3">
+            <time className="w-32 shrink-0 text-xs tabular-nums text-stone-400">
+              {new Date(w.created_at).toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Warsaw" })}
+            </time>
+            <span className="text-stone-800">{opis(w)}</span>
+            <span className="text-xs text-stone-400">— {kto(w.kto)}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
