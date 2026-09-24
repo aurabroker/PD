@@ -20,6 +20,8 @@ export type DanePotwierdzenia = {
   zlozono: Date;
   /** Nazwy plików w załączniku: kopia wniosku (PDF), informacja o dystrybutorze, nota RODO. */
   zalaczniki: string[];
+  /** Opcjonalny baner (pełny adres obrazka) — patrz email/promo.ts. */
+  promo?: { obraz: string; href: string; alt: string; szerokosc: number } | null;
 };
 
 export type Wiadomosc = { temat: string; html: string; tekst: string };
@@ -177,7 +179,13 @@ export function mailPotwierdzenieKlienta(d: DanePotwierdzenia): Wiadomosc {
       </table>
     </td></tr>
 
-    <tr><td style="background:${KOLOR.tlo};padding:18px 28px;border-top:1px solid ${KOLOR.linia};">
+${d.promo ? `    <tr><td style="padding:0 28px 24px;">
+      <a href="${h(d.promo.href)}" target="_blank" rel="noopener" style="display:block;text-decoration:none;">
+        <img src="${h(d.promo.obraz)}" width="${d.promo.szerokosc}" alt="${h(d.promo.alt)}" style="display:block;width:100%;max-width:${d.promo.szerokosc}px;height:auto;border:0;border-radius:8px;${FONT}font-size:14px;color:${KOLOR.marka};">
+      </a>
+    </td></tr>
+
+` : ""}    <tr><td style="background:${KOLOR.tlo};padding:18px 28px;border-top:1px solid ${KOLOR.linia};">
       <p style="${FONT}margin:0 0 4px;font-size:12px;font-weight:600;color:${KOLOR.szary};">Informacja o dystrybutorze</p>
       <p style="${FONT}margin:0 0 12px;font-size:11px;line-height:16px;color:${KOLOR.szary};">${h(INFORMACJA_O_DYSTRYBUTORZE)}</p>
       <p style="${FONT}margin:0 0 4px;font-size:12px;font-weight:600;color:${KOLOR.szary};">Ochrona danych osobowych (RODO)</p>
@@ -215,6 +223,7 @@ export function mailPotwierdzenieKlienta(d: DanePotwierdzenia): Wiadomosc {
     ...d.zalaczniki.map((z) => `- ${z}`),
     `Pierwszy plik to kopia wniosku. Widzisz błąd? Odpowiedz na tę wiadomość.`,
     ``,
+    ...(d.promo ? [`${d.promo.alt}: ${d.promo.href}`, ``] : []),
     `--`,
     `INFORMACJA O DYSTRYBUTORZE`,
     INFORMACJA_O_DYSTRYBUTORZE,
