@@ -372,6 +372,13 @@ await uruchom("T2 autozapis niekompletnego wniosku (klient wpisał tylko nazwę)
   sprawdz(stan === "zapisano", "wersja robocza zapisuje się mimo braku pozostałych pól", `wskaźnik: ${stan}`);
   const w = sql(`select nazwa_firmy from mienie_wnioski where form_token='${token}'`);
   sprawdz(w === "Tylko nazwa", "DB: nazwa zapisana w wersji roboczej", w);
+  const linkRodo = page.locator("footer").getByRole("link", { name: "Nota informacyjna RODO" });
+  sprawdz(await linkRodo.isVisible(), "stopka formularza: link do noty RODO");
+  for (const nazwa of ["Nota informacyjna RODO", "Informacja o dystrybutorze"]) {
+    const href = await page.locator("footer").getByRole("link", { name: nazwa }).getAttribute("href");
+    const odp = await fetch(APP + href);
+    sprawdz(odp.status === 200 && odp.headers.get("content-type")?.includes("pdf"), `dokument „${nazwa}” dostępny (PDF)`, `${odp.status} ${odp.headers.get("content-type")}`);
+  }
   const pdfRoboczy = await fetch(`${APP}/api/wniosek/${token}/pdf`);
   sprawdz(pdfRoboczy.status === 409, "PDF wersji roboczej niedostępny (409)", String(pdfRoboczy.status));
 }, browser);

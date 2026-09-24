@@ -18,7 +18,7 @@ import { Pole, PoleKwota, PoleObszar, PoleTakNie, PoleWybor, Sekcja } from "@/co
 import { zl } from "@/lib/format";
 import KrokLokalizacja from "./KrokLokalizacja";
 import WeryfikacjaRegon from "./WeryfikacjaRegon";
-import { TRESC_ZGODY } from "@/lib/dystrybutor";
+import { DOKUMENTY, TRESC_ZGODY } from "@/lib/dystrybutor";
 import { TabelaSzkod, WykazElektroniki, WykazSprzetuMedycznego } from "./KrokiPomocnicze";
 
 type Props = {
@@ -510,6 +510,18 @@ function KrokPodsumowanie() {
           <PoleTakNie
             etykieta={TRESC_ZGODY.rodo}
             rejestracja={register("zgoda_rodo")} />
+
+          <p className="text-xs text-stone-500">
+            Zasady przetwarzania danych:{" "}
+            <a href={`/dokumenty/${DOKUMENTY.rodo.plik}`} target="_blank" rel="noopener" className="underline hover:text-marka-700">
+              nota informacyjna RODO
+            </a>
+            {" · "}
+            <a href={`/dokumenty/${DOKUMENTY.dystrybutor.plik}`} target="_blank" rel="noopener" className="underline hover:text-marka-700">
+              informacja o dystrybutorze
+            </a>
+            {" "}(otwierają się w nowej karcie, wpisane dane zostają).
+          </p>
         </div>
       </Sekcja>
     </div>
