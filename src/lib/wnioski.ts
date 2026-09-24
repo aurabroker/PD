@@ -5,6 +5,7 @@ import { znormalizujNumeracje } from "./schema";
 import type { WniosekRoboczy } from "./schema";
 import type { Zgodnosc } from "./excel/zgodnosc";
 import { zapiszHistorie } from "./historia";
+import { nadajNumer } from "./numeracja";
 
 /**
  * Token dostepu do wniosku. Zachowuje format uzywany przez wczesniejsze wnioski
@@ -123,10 +124,15 @@ export async function zapiszWniosek(
     aktualizacja.status_zmieniony_at = teraz;
   }
 
-  const { error } = await supabase
-    .from("mienie_wnioski")
-    .update(aktualizacja)
-    .eq("id", istniejacy.id);
+  // Numer z prefiksem zakresu nadajemy dopiero przy złożeniu (patrz numeracja.ts).
+  // Kolizja końcówki (unikalny indeks) jest skrajnie mało prawdopodobna — losujemy ponownie.
+  let error: { message: string; code?: string } | null = null;
+  for (let proba = 0; proba < 5; proba++) {
+    if (opcje.zloz) aktualizacja.nr_referencyjny = nadajNumer(dane.zakres, new Date(teraz));
+    ({ error } = await supabase.from("mienie_wnioski").update(aktualizacja).eq("id", istniejacy.id));
+    const kolizjaNumeru = error?.code === "23505" && /nr_referencyjny/.test(error.message);
+    if (!opcje.zloz || !kolizjaNumeru) break;
+  }
 
   if (error) throw new Error(`Nie udało się zapisać wniosku: ${error.message}`);
 

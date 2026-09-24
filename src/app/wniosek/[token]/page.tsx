@@ -53,7 +53,6 @@ export default async function StronaWniosku({
       token={token}
       wartosciPoczatkowe={wynik.dane}
       zImportu={zrodlo === "excel"}
-      nrReferencyjny={wynik.meta.nr_referencyjny}
     />
   );
 }

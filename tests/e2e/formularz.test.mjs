@@ -146,6 +146,17 @@ async function wypelnijLokalizacje(page, i, sumy) {
   for (const [k, v] of Object.entries(sumy)) await wpisz(page, p(k), v);
 }
 
+/** Numer nadany przy złożeniu: format PD/…, dzisiejsza data (Warszawa), prefiks zgodny z zakresem. */
+function sprawdzNumer(token, skad) {
+  const [nr, zakres] = sql(`select nr_referencyjny, zakres::text from mienie_wnioski where form_token='${token}'`).split("|");
+  const eei = zakres.includes("Sprzęt elektroniczny (EEI)");
+  const mienie = JSON.parse(zakres).some((z) => z !== "Sprzęt elektroniczny (EEI)");
+  const prefiks = eei && !mienie ? "EEI" : eei ? "PD/EEI" : "PD";
+  const dzis = new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw", day: "2-digit", month: "2-digit", year: "numeric" })
+    .format(new Date()).replace(/\./g, "");
+  sprawdz(new RegExp(`^${prefiks.replace("/", "\\/")}\\/${dzis}\\/[A-HJ-NP-Z2-9]{6}$`).test(nr), `${skad}: numer ${prefiks}/${dzis}/… zgodny z zakresem`, `${nr} (zakres: ${zakres})`);
+}
+
 async function uruchom(nazwa, fn, browser) {
   if (TYLKO && !TYLKO.includes(nazwa.split(" ")[0])) return;
   biezacy = nazwa;
@@ -252,7 +263,8 @@ await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie
   await page.waitForURL(/\/zlozony$/, { timeout: 20000 });
   sprawdz(await page.getByText("Dziękujemy").isVisible(), "strona potwierdzenia po złożeniu");
   const potw = await page.locator("main").innerText();
-  sprawdz(/MIE-\d{6}-[A-Z0-9]{6}/.test(potw), "numer referencyjny widoczny na potwierdzeniu", potw.slice(0, 200));
+  sprawdz(/(PD|PD\/EEI|EEI)\/\d{8}\/[A-HJ-NP-Z2-9]{6}/.test(potw), "numer referencyjny (PD/…) widoczny na potwierdzeniu", potw.slice(0, 200));
+  sprawdzNumer(token, "T1");
 
   // Weryfikacja w bazie
   const [status, wyslano, suma, zakres, med, eei, szk, rodo, data] = sql(
@@ -409,6 +421,7 @@ await uruchom("T7 import Excela przez stronę i złożenie", async ({ page }) =>
   await page.waitForURL(/\/zlozony$/, { timeout: 20000 });
   const r = sql(`select status, suma_lacznie from mienie_wnioski where form_token='${token}'`);
   sprawdz(r === "zlozony|1333000", "DB: wniosek z Excela złożony, suma 1 333 000", r);
+  sprawdzNumer(token, "T7");
   const n = sql(`select count(*) from mienie_lokalizacje l join mienie_wnioski w on w.id=l.wniosek_id where w.form_token='${token}'`);
   sprawdz(n === "2", "DB: 2 lokalizacje z pliku", n);
 }, browser);

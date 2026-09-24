@@ -24,10 +24,9 @@ type Props = {
   token: string;
   wartosciPoczatkowe: Wniosek;
   zImportu: boolean;
-  nrReferencyjny: string;
 };
 
-export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu, nrReferencyjny }: Props) {
+export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: Props) {
   const metody = useForm<Wniosek>({
     defaultValues: wartosciPoczatkowe,
     resolver: zodResolver(wniosekSchema),
@@ -164,7 +163,7 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu, nr
         <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Wniosek o ubezpieczenie majątkowe</h1>
-            <p className="mt-1 text-sm text-stone-500">Numer wniosku: {nrReferencyjny}</p>
+            <p className="mt-1 text-sm text-stone-500">Numer wniosku nadamy po jego złożeniu.</p>
           </div>
           <WskaznikZapisu stan={stanZapisu} onZapisz={zapisz} />
         </div>

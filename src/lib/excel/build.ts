@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import type { WniosekRoboczy } from "../schema";
 import { sumaLokalizacji } from "../schema";
 import { SZABLON_XLSX_BASE64 } from "./szablon.generated";
+import { WZOR_NUMERU, numerDoPliku } from "../numeracja";
 
 /**
  * Eksport wniosku do .xlsx.
@@ -24,7 +25,10 @@ import { SZABLON_XLSX_BASE64 } from "./szablon.generated";
  */
 export const NAGLOWEK_EKSPORTU = { arkusz: "1. Dane firmy", adres: "B3" } as const;
 export const naglowekEksportu = (nr: string) => `Wniosek ${nr} — wygenerowany z systemu Aura Expert`;
-export const WZOR_NAGLOWKA_EKSPORTU = /^Wniosek MIE-\d{6}-[0-9A-F]{6} — wygenerowany z systemu Aura Expert$/;
+// Numer techniczny wniosku roboczego (MIE-…) albo numer nadany przy złożeniu (PD/…, PD/EEI/…, EEI/…).
+export const WZOR_NAGLOWKA_EKSPORTU = new RegExp(
+  `^Wniosek (MIE-\\d{6}-[0-9A-F]{6}|${WZOR_NUMERU.source.slice(1, -1)}) — wygenerowany z systemu Aura Expert$`,
+);
 
 export function wczytajSzablon(): ArrayBuffer {
   const binarnie = atob(SZABLON_XLSX_BASE64);
@@ -326,5 +330,5 @@ export function nazwaPliku(nrReferencyjny: string, nazwaFirmy: string): string {
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 40);
-  return `${nrReferencyjny}${firma ? `_${firma}` : ""}.xlsx`;
+  return `${numerDoPliku(nrReferencyjny)}${firma ? `_${firma}` : ""}.xlsx`;
 }
