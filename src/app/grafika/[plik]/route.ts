@@ -1,15 +1,22 @@
-import { BANERY } from "@/lib/email/promo";
+import { BANERY, WARIANTY } from "@/lib/email/promo";
 
 /**
  * Grafiki banera podawane z naszej domeny.
  *
  * Pliki serwuje worker `banery` (banery.auraexpert.pl), ale obrazek z innej domeny
  * i z „/banery/” w adresie to typowy cel blokerów reklam — klient widział
- * pustą ramkę. Serwujemy je więc spod /grafika/<nazwa>.png: pobieramy
+ * pustą ramkę. Serwujemy je więc spod /grafika/<nazwa>.<rozszerzenie>: pobieramy
  * źródło po stronie serwera (z cache Cloudflare na dobę) i oddajemy jako
- * własny zasób. Tylko nazwy z listy BANERY — to nie jest otwarte proxy.
+ * własny zasób. Tylko nazwy z listy BANERY i ich warianty (JPG/WebP,
+ * 1200/600 px) — to nie jest otwarte proxy. Stary adres .png → JPG.
  */
-const DOZWOLONE = new Map(BANERY.map((b) => [`${b.nazwa}.png`, b.url]));
+const ZRODLO = "https://banery.auraexpert.pl/banery/";
+const DOZWOLONE = new Map<string, string>(
+  BANERY.flatMap((b) => [
+    ...WARIANTY.map((w) => [`${b.nazwa}${w}`, `${ZRODLO}${b.nazwa}${w}`] as [string, string]),
+    [`${b.nazwa}.png`, `${ZRODLO}${b.nazwa}.jpg`] as [string, string],
+  ]),
+);
 
 export async function GET(_: Request, { params }: { params: Promise<{ plik: string }> }) {
   const { plik } = await params;

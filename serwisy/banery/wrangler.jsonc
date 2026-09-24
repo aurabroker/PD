@@ -4,7 +4,7 @@
   "name": "banery",
   "main": "src/index.js",
   "compatibility_date": "2026-09-22",
-  "rules": [{ "type": "Data", "globs": ["**/*.png"], "fallthrough": false }],
+  "rules": [{ "type": "Data", "globs": ["**/*.jpg", "**/*.webp"], "fallthrough": false }],
   "workers_dev": true,
   "preview_urls": false,
   "routes": [{ "pattern": "banery.auraexpert.pl", "custom_domain": true }],

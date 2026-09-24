@@ -1,76 +1,184 @@
 {
   "banery": [
     {
+      "nazwa": "programista",
+      "szerokosc": 1200,
+      "wysokosc": 628,
+      "url": "https://banery.auraexpert.pl/banery/programista.jpg",
+      "webp": "https://banery.auraexpert.pl/banery/programista.webp",
+      "maly": {
+        "szerokosc": 600,
+        "wysokosc": 314,
+        "url": "https://banery.auraexpert.pl/banery/programista-600.jpg",
+        "webp": "https://banery.auraexpert.pl/banery/programista-600.webp"
+      },
       "plik": "programista.png",
-      "url": "https://banery.auraexpert.pl/banery/programista.png",
-      "szerokosc": 1200,
-      "wysokosc": 628
+      "oryginal_png": "https://banery.auraexpert.pl/banery/programista.png"
     },
     {
+      "nazwa": "balerina",
+      "szerokosc": 1200,
+      "wysokosc": 628,
+      "url": "https://banery.auraexpert.pl/banery/balerina.jpg",
+      "webp": "https://banery.auraexpert.pl/banery/balerina.webp",
+      "maly": {
+        "szerokosc": 600,
+        "wysokosc": 314,
+        "url": "https://banery.auraexpert.pl/banery/balerina-600.jpg",
+        "webp": "https://banery.auraexpert.pl/banery/balerina-600.webp"
+      },
       "plik": "balerina.png",
-      "url": "https://banery.auraexpert.pl/banery/balerina.png",
-      "szerokosc": 1200,
-      "wysokosc": 628
+      "oryginal_png": "https://banery.auraexpert.pl/banery/balerina.png"
     },
     {
+      "nazwa": "aktor",
+      "szerokosc": 1200,
+      "wysokosc": 628,
+      "url": "https://banery.auraexpert.pl/banery/aktor.jpg",
+      "webp": "https://banery.auraexpert.pl/banery/aktor.webp",
+      "maly": {
+        "szerokosc": 600,
+        "wysokosc": 314,
+        "url": "https://banery.auraexpert.pl/banery/aktor-600.jpg",
+        "webp": "https://banery.auraexpert.pl/banery/aktor-600.webp"
+      },
       "plik": "aktor.png",
-      "url": "https://banery.auraexpert.pl/banery/aktor.png",
-      "szerokosc": 1200,
-      "wysokosc": 628
+      "oryginal_png": "https://banery.auraexpert.pl/banery/aktor.png"
     },
     {
+      "nazwa": "architekt",
+      "szerokosc": 1200,
+      "wysokosc": 628,
+      "url": "https://banery.auraexpert.pl/banery/architekt.jpg",
+      "webp": "https://banery.auraexpert.pl/banery/architekt.webp",
+      "maly": {
+        "szerokosc": 600,
+        "wysokosc": 314,
+        "url": "https://banery.auraexpert.pl/banery/architekt-600.jpg",
+        "webp": "https://banery.auraexpert.pl/banery/architekt-600.webp"
+      },
       "plik": "architekt.png",
-      "url": "https://banery.auraexpert.pl/banery/architekt.png",
-      "szerokosc": 1200,
-      "wysokosc": 628
+      "oryginal_png": "https://banery.auraexpert.pl/banery/architekt.png"
     },
     {
+      "nazwa": "dentysta",
+      "szerokosc": 1200,
+      "wysokosc": 628,
+      "url": "https://banery.auraexpert.pl/banery/dentysta.jpg",
+      "webp": "https://banery.auraexpert.pl/banery/dentysta.webp",
+      "maly": {
+        "szerokosc": 600,
+        "wysokosc": 314,
+        "url": "https://banery.auraexpert.pl/banery/dentysta-600.jpg",
+        "webp": "https://banery.auraexpert.pl/banery/dentysta-600.webp"
+      },
       "plik": "dentysta.png",
-      "url": "https://banery.auraexpert.pl/banery/dentysta.png",
-      "szerokosc": 1200,
-      "wysokosc": 628
+      "oryginal_png": "https://banery.auraexpert.pl/banery/dentysta.png"
     },
     {
+      "nazwa": "przedsiebiorca",
+      "szerokosc": 1200,
+      "wysokosc": 628,
+      "url": "https://banery.auraexpert.pl/banery/przedsiebiorca.jpg",
+      "webp": "https://banery.auraexpert.pl/banery/przedsiebiorca.webp",
+      "maly": {
+        "szerokosc": 600,
+        "wysokosc": 314,
+        "url": "https://banery.auraexpert.pl/banery/przedsiebiorca-600.jpg",
+        "webp": "https://banery.auraexpert.pl/banery/przedsiebiorca-600.webp"
+      },
       "plik": "przedsiebiorca.png",
-      "url": "https://banery.auraexpert.pl/banery/przedsiebiorca.png",
-      "szerokosc": 1200,
-      "wysokosc": 628
+      "oryginal_png": "https://banery.auraexpert.pl/banery/przedsiebiorca.png"
     },
     {
+      "nazwa": "nurkowanie",
+      "szerokosc": 1200,
+      "wysokosc": 628,
+      "url": "https://banery.auraexpert.pl/banery/nurkowanie.jpg",
+      "webp": "https://banery.auraexpert.pl/banery/nurkowanie.webp",
+      "maly": {
+        "szerokosc": 600,
+        "wysokosc": 314,
+        "url": "https://banery.auraexpert.pl/banery/nurkowanie-600.jpg",
+        "webp": "https://banery.auraexpert.pl/banery/nurkowanie-600.webp"
+      },
       "plik": "nurkowanie.png",
-      "url": "https://banery.auraexpert.pl/banery/nurkowanie.png",
-      "szerokosc": 1200,
-      "wysokosc": 628
+      "oryginal_png": "https://banery.auraexpert.pl/banery/nurkowanie.png"
     },
     {
+      "nazwa": "jacht",
+      "szerokosc": 1200,
+      "wysokosc": 628,
+      "url": "https://banery.auraexpert.pl/banery/jacht.jpg",
+      "webp": "https://banery.auraexpert.pl/banery/jacht.webp",
+      "maly": {
+        "szerokosc": 600,
+        "wysokosc": 314,
+        "url": "https://banery.auraexpert.pl/banery/jacht-600.jpg",
+        "webp": "https://banery.auraexpert.pl/banery/jacht-600.webp"
+      },
       "plik": "jacht.png",
-      "url": "https://banery.auraexpert.pl/banery/jacht.png",
-      "szerokosc": 1200,
-      "wysokosc": 628
+      "oryginal_png": "https://banery.auraexpert.pl/banery/jacht.png"
     },
     {
+      "nazwa": "narty",
+      "szerokosc": 1200,
+      "wysokosc": 628,
+      "url": "https://banery.auraexpert.pl/banery/narty.jpg",
+      "webp": "https://banery.auraexpert.pl/banery/narty.webp",
+      "maly": {
+        "szerokosc": 600,
+        "wysokosc": 314,
+        "url": "https://banery.auraexpert.pl/banery/narty-600.jpg",
+        "webp": "https://banery.auraexpert.pl/banery/narty-600.webp"
+      },
       "plik": "narty.png",
-      "url": "https://banery.auraexpert.pl/banery/narty.png",
-      "szerokosc": 1200,
-      "wysokosc": 628
+      "oryginal_png": "https://banery.auraexpert.pl/banery/narty.png"
     },
     {
+      "nazwa": "rodzina",
+      "szerokosc": 1200,
+      "wysokosc": 628,
+      "url": "https://banery.auraexpert.pl/banery/rodzina.jpg",
+      "webp": "https://banery.auraexpert.pl/banery/rodzina.webp",
+      "maly": {
+        "szerokosc": 600,
+        "wysokosc": 314,
+        "url": "https://banery.auraexpert.pl/banery/rodzina-600.jpg",
+        "webp": "https://banery.auraexpert.pl/banery/rodzina-600.webp"
+      },
       "plik": "rodzina.png",
-      "url": "https://banery.auraexpert.pl/banery/rodzina.png",
-      "szerokosc": 1200,
-      "wysokosc": 628
+      "oryginal_png": "https://banery.auraexpert.pl/banery/rodzina.png"
     },
     {
+      "nazwa": "podroze",
+      "szerokosc": 1200,
+      "wysokosc": 628,
+      "url": "https://banery.auraexpert.pl/banery/podroze.jpg",
+      "webp": "https://banery.auraexpert.pl/banery/podroze.webp",
+      "maly": {
+        "szerokosc": 600,
+        "wysokosc": 314,
+        "url": "https://banery.auraexpert.pl/banery/podroze-600.jpg",
+        "webp": "https://banery.auraexpert.pl/banery/podroze-600.webp"
+      },
       "plik": "podroze.png",
-      "url": "https://banery.auraexpert.pl/banery/podroze.png",
-      "szerokosc": 1200,
-      "wysokosc": 628
+      "oryginal_png": "https://banery.auraexpert.pl/banery/podroze.png"
     },
     {
-      "plik": "dom.png",
-      "url": "https://banery.auraexpert.pl/banery/dom.png",
+      "nazwa": "dom",
       "szerokosc": 1200,
-      "wysokosc": 628
+      "wysokosc": 628,
+      "url": "https://banery.auraexpert.pl/banery/dom.jpg",
+      "webp": "https://banery.auraexpert.pl/banery/dom.webp",
+      "maly": {
+        "szerokosc": 600,
+        "wysokosc": 314,
+        "url": "https://banery.auraexpert.pl/banery/dom-600.jpg",
+        "webp": "https://banery.auraexpert.pl/banery/dom-600.webp"
+      },
+      "plik": "dom.png",
+      "oryginal_png": "https://banery.auraexpert.pl/banery/dom.png"
     }
   ]
 }

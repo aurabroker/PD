@@ -8,15 +8,27 @@ import type { Baner } from "@/lib/email/promo";
  * domenie — gdy się nie wczyta (brak pliku, blokada), zamiast pustej ramki
  * pokazujemy kartę tekstową z tym samym linkiem.
  */
+/** Baner zajmuje szerokość treści: pełny ekran telefonu, najwyżej ~640 px na komputerze. */
+const ROZMIARY = "(max-width: 672px) 100vw, 640px";
+
 export default function BanerPromo({ baner }: { baner: Baner }) {
   const [blad, setBlad] = useState(false);
   const obraz = useRef<HTMLImageElement>(null);
 
   // Błąd ładowania mógł wystąpić, zanim React podpiął onError (obrazek z HTML
-  // renderowanego na serwerze) — sprawdzamy stan po hydracji.
+  // renderowanego na serwerze). `complete` + `naturalWidth` nie wystarcza: przy
+  // <picture> przeglądarka bywa „complete” jeszcze przed pobraniem pliku.
+  // decode() czeka na faktyczny wynik i odrzuca tylko uszkodzony obrazek.
   useEffect(() => {
     const img = obraz.current;
-    if (img && img.complete && img.naturalWidth === 0) setBlad(true);
+    if (!img) return;
+    let aktywny = true;
+    img.decode().catch(() => {
+      if (aktywny && img.naturalWidth === 0) setBlad(true);
+    });
+    return () => {
+      aktywny = false;
+    };
   }, []);
 
   return (
@@ -38,15 +50,22 @@ export default function BanerPromo({ baner }: { baner: Baner }) {
           <span className="shrink-0 text-sm font-medium text-marka-700" aria-hidden="true">→</span>
         </span>
       ) : (
-        // eslint-disable-next-line @next/next/no-img-element -- grafika z zewnętrznej domeny, bez optymalizacji Next
-        <img
-          ref={obraz}
-          src={baner.obraz}
-          alt={baner.alt}
-          referrerPolicy="no-referrer"
-          className="block h-auto w-full"
-          onError={() => setBlad(true)}
-        />
+        <picture>
+          {baner.srcsetWebp && <source type="image/webp" srcSet={baner.srcsetWebp} sizes={ROZMIARY} />}
+          {/* eslint-disable-next-line @next/next/no-img-element -- warianty z workera banery, bez optymalizacji Next */}
+          <img
+            ref={obraz}
+            src={baner.obraz}
+            srcSet={baner.srcsetJpg}
+            sizes={baner.srcsetJpg ? ROZMIARY : undefined}
+            width={1200}
+            height={628}
+            alt={baner.alt}
+            referrerPolicy="no-referrer"
+            className="block h-auto w-full"
+            onError={() => setBlad(true)}
+          />
+        </picture>
       )}
     </a>
   );

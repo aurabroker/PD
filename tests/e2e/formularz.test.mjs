@@ -42,7 +42,7 @@ const PNG_1X1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0l
 async function nowaStrona(browser, opcje = {}) {
   const ctx = await browser.newContext({ acceptDownloads: true, locale: "pl-PL", ...opcje });
   // Grafiki banera app pobiera z banery.auraexpert.pl (w replice niedostępne) — w przeglądarce podstawiamy obrazek 1×1.
-  await ctx.route(/\/grafika\/[a-z]+\.png$/, (r) => r.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }));
+  await ctx.route(/\/grafika\/[a-z]+(-600)?\.(png|jpg|webp)$/, (r) => r.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }));
   const page = await ctx.newPage();
   const bledy = [];
   page.on("pageerror", (e) => bledy.push(`pageerror na ${page.url().replace(APP, "")}: ${e.message}`));
@@ -287,7 +287,9 @@ await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie
   const hrefBanera = await baner.getAttribute("href");
   const srcBanera = await baner.locator("img").getAttribute("src");
   sprawdz(/^https:\/\/utratadochodu\.pl\/\?utm_source=wnioski&utm_medium=display&utm_campaign=thankyou&utm_content=wnioskibeauty&utm_term=[a-z]+$/.test(hrefBanera ?? ""), "baner na stronie „Dziękujemy”: link z UTM", hrefBanera);
-  sprawdz(/^\/grafika\/[a-z]+\.png$/.test(srcBanera ?? "") && srcBanera.includes(hrefBanera.split("utm_term=")[1]), "baner: grafika z naszej domeny (odporna na blokery), utm_term = nazwa grafiki", srcBanera);
+  const webpBanera = await baner.locator('source[type="image/webp"]').getAttribute("srcset");
+  sprawdz(/^\/grafika\/[a-z]+-600\.webp 600w, \/grafika\/[a-z]+\.webp 1200w$/.test(webpBanera ?? ""), "baner: lekkie WebP 600/1200 px dla telefonów i komputerów", webpBanera);
+  sprawdz(/^\/grafika\/[a-z]+\.jpg$/.test(srcBanera ?? "") && srcBanera.includes(hrefBanera.split("utm_term=")[1]), "baner: grafika z naszej domeny (odporna na blokery), utm_term = nazwa grafiki", srcBanera);
   await page.waitForFunction(() => document.querySelector("a[data-oferta] img")?.complete, null, { timeout: 10000 }).catch(() => {});
   sprawdz((await baner.getAttribute("data-oferta-stan")) === "grafika", "baner: grafika wyświetlona");
   sprawdz((await baner.getAttribute("target")) === "_blank" && /noopener/.test(await baner.getAttribute("rel")), "baner otwiera się w nowej karcie (noopener)");
@@ -950,7 +952,7 @@ await uruchom("T21 statystyki: liczby zgodne z bazą", async ({ page }) => {
 await uruchom("T22 baner: grafika niedostępna → karta tekstowa z tym samym linkiem", async ({ page, bledy }) => {
   const id = await zlozonyWniosek(page, "T22 Salon Baner");
   const token = sql(`select form_token from mienie_wnioski where id='${id}'`);
-  await page.route(/\/grafika\/[a-z]+\.png$/, (r) => r.fulfill({ status: 502, body: "brak" }));
+  await page.route(/\/grafika\/[a-z]+(-600)?\.(png|jpg|webp)$/, (r) => r.fulfill({ status: 502, body: "brak" }));
   await page.goto(`${APP}/wniosek/${token}/zlozony`);
   const baner = page.locator("a[data-oferta]");
   await page.waitForFunction(() => document.querySelector("a[data-oferta]")?.getAttribute("data-oferta-stan") === "tekst", null, { timeout: 10000 }).catch(() => {});
@@ -963,9 +965,12 @@ await uruchom("T22 baner: grafika niedostępna → karta tekstowa z tym samym li
   // Trasa /grafika: tylko nazwy z listy (nie otwarte proxy); źródło niedostępne → 502, nie awaria.
   sprawdz((await fetch(`${APP}/grafika/nieznany.png`)).status === 404, "/grafika: nazwa spoza listy → 404");
   sprawdz((await fetch(`${APP}/grafika/..%2F..%2Fapi%2Fstan`)).status === 404, "/grafika: próba wyjścia poza listę → 404");
-  const g = await fetch(`${APP}/grafika/programista.png`);
-  const typ = g.headers.get("content-type") ?? "";
-  sprawdz((g.status === 200 && typ.startsWith("image/")) || g.status === 502, "/grafika/programista.png: obraz albo 502 (w replice źródło bywa niedostępne)", `${g.status} ${typ}`);
+  sprawdz((await fetch(`${APP}/grafika/programista-300.webp`)).status === 404, "/grafika: nieistniejący wariant → 404");
+  for (const w of ["programista.png", "programista.jpg", "programista-600.webp"]) {
+    const g = await fetch(`${APP}/grafika/${w}`);
+    const typ = g.headers.get("content-type") ?? "";
+    sprawdz((g.status === 200 && typ.startsWith("image/")) || g.status === 502, `/grafika/${w}: obraz albo 502 (w replice źródło bywa niedostępne)`, `${g.status} ${typ}`);
+  }
 }, browser);
 
 await browser.close();

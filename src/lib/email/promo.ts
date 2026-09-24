@@ -12,7 +12,11 @@
 export const BANERY = [
   "programista", "balerina", "aktor", "architekt", "dentysta", "przedsiebiorca",
   "nurkowanie", "jacht", "narty", "rodzina", "podroze", "dom",
-].map((nazwa) => ({ nazwa, url: `https://banery.auraexpert.pl/banery/${nazwa}.png` }));
+].map((nazwa) => ({ nazwa, url: `https://banery.auraexpert.pl/banery/${nazwa}.jpg` }));
+
+/** Warianty każdej grafiki w workerze `banery`: JPG i WebP, 1200 i 600 px szerokości. */
+export const WARIANTY = [".jpg", ".webp", "-600.jpg", "-600.webp"] as const;
+const ZRODLO = "https://banery.auraexpert.pl/banery/";
 
 export const PROMO = {
   wMailu: false,
@@ -20,7 +24,16 @@ export const PROMO = {
   szerokosc: 544,
 };
 
-export type Baner = { obraz: string; href: string; alt: string; szerokosc: number };
+export type Baner = {
+  /** JPG 1200 px — dla maila i jako zapasowy `src` na stronie. */
+  obraz: string;
+  /** Na stronie: lżejsze WebP i mniejsze warianty dla telefonów. */
+  srcsetWebp?: string;
+  srcsetJpg?: string;
+  href: string;
+  alt: string;
+  szerokosc: number;
+};
 
 /**
  * Losowy baner z linkiem oznaczonym UTM dla danego miejsca wyświetlenia.
@@ -36,6 +49,13 @@ export function losujBaner(zrodlo: "email" | "strona"): Baner {
     utm_content: "wnioskibeauty",
     utm_term: b.nazwa,
   });
-  const obraz = zrodlo === "strona" ? `/grafika/${b.nazwa}.png` : b.url;
-  return { obraz, href: `https://utratadochodu.pl/?${utm}`, alt: PROMO.alt, szerokosc: PROMO.szerokosc };
+  const wspolne = { href: `https://utratadochodu.pl/?${utm}`, alt: PROMO.alt, szerokosc: PROMO.szerokosc };
+  if (zrodlo === "email") return { obraz: `${ZRODLO}${b.nazwa}.jpg`, ...wspolne };
+  const g = `/grafika/${b.nazwa}`;
+  return {
+    obraz: `${g}.jpg`,
+    srcsetWebp: `${g}-600.webp 600w, ${g}.webp 1200w`,
+    srcsetJpg: `${g}-600.jpg 600w, ${g}.jpg 1200w`,
+    ...wspolne,
+  };
 }
