@@ -18,5 +18,11 @@
   },
   "observability": {
     "enabled": true
+  },
+  // Zmienne jawne trzymamy tutaj, nie w panelu: `wrangler deploy` przy kazdym
+  // wdrozeniu usuwa zmienne ustawione recznie w panelu Cloudflare.
+  // Sekrety (RESEND_API_KEY itd.) zostaja w panelu — deploy ich nie rusza.
+  "vars": {
+    "RESEND_SENDER": "Wniosek ubezpieczeniowy <hub@auraexpert.pl>"
   }
 }
