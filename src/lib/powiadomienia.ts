@@ -2,7 +2,7 @@ import "server-only";
 import { DOKUMENTY } from "./dystrybutor";
 import { mailNowyWniosekAgent } from "./email/nowy-wniosek-agent";
 import { mailPotwierdzenieKlienta } from "./email/potwierdzenie-klienta";
-import { PROMO } from "./email/promo";
+import { losujBaner, PROMO } from "./email/promo";
 import { wyslijEmail, type Zalacznik } from "./email/wyslij";
 import { numerDoPliku } from "./numeracja";
 import { base64NaBajty, generujPdfWniosku } from "./pdf/wniosek-pdf";
@@ -55,7 +55,7 @@ export async function powiadomOZlozeniu(wniosekId: string, adresAplikacji: strin
         zakres: dane.zakres,
         zlozono,
         zalaczniki: zalaczniki.map((z) => z.nazwa),
-        promo: PROMO.obraz ? { ...PROMO, obraz: `${adresAplikacji}${PROMO.obraz}` } : null,
+        promo: PROMO.wMailu ? losujBaner("email") : null,
       });
       await wyslijEmail({
         do: dane.email_kontaktowy,

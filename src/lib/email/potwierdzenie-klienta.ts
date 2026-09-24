@@ -1,5 +1,6 @@
 import { zl } from "../format";
 import { DYSTRYBUTOR } from "../dystrybutor";
+import type { Baner } from "./promo";
 
 /**
  * Mail do klienta po złożeniu wniosku.
@@ -20,8 +21,8 @@ export type DanePotwierdzenia = {
   zlozono: Date;
   /** Nazwy plików w załączniku: kopia wniosku (PDF), informacja o dystrybutorze, nota RODO. */
   zalaczniki: string[];
-  /** Opcjonalny baner (pełny adres obrazka) — patrz email/promo.ts. */
-  promo?: { obraz: string; href: string; alt: string; szerokosc: number } | null;
+  /** Opcjonalny baner — patrz email/promo.ts. */
+  promo?: Baner | null;
 };
 
 export type Wiadomosc = { temat: string; html: string; tekst: string };

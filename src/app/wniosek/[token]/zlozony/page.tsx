@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { pobierzWniosek } from "@/lib/wnioski";
 import { zl } from "@/lib/format";
 import { sumaWniosku } from "@/lib/schema";
+import { losujBaner } from "@/lib/email/promo";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export default async function StronaZlozony({ params }: { params: Promise<{ toke
   const { token } = await params;
   const wynik = await pobierzWniosek(token);
   if (!wynik) notFound();
+  const baner = losujBaner("strona");
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-16">
@@ -58,6 +60,23 @@ export default async function StronaZlozony({ params }: { params: Promise<{ toke
           </a>
         </p>
       </div>
+
+      <a
+        href={baner.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-6 block overflow-hidden rounded-xl border border-stone-200 bg-white transition hover:border-marka-300"
+        data-baner={baner.obraz}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- grafika z zewnętrznej domeny, bez optymalizacji Next */}
+        <img
+          src={baner.obraz}
+          alt={baner.alt}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="block h-auto w-full"
+        />
+      </a>
     </main>
   );
 }

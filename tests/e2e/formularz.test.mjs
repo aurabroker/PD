@@ -37,8 +37,12 @@ function sprawdz(warunek, opis, szczegol = "") {
   console.log(`  ${warunek ? "PASS" : "FAIL"}  ${opis}${!warunek && szczegol ? `\n        -> ${szczegol}` : ""}`);
 }
 
+const PNG_1X1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+
 async function nowaStrona(browser, opcje = {}) {
   const ctx = await browser.newContext({ acceptDownloads: true, locale: "pl-PL", ...opcje });
+  // Banery utratadochodu.pl leżą na zewnętrznej domenie — w teście podstawiamy obrazek 1×1.
+  await ctx.route("https://ergo.auraexpert.pl/**", (r) => r.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }));
   const page = await ctx.newPage();
   const bledy = [];
   page.on("pageerror", (e) => bledy.push(`pageerror na ${page.url().replace(APP, "")}: ${e.message}`));
@@ -279,6 +283,12 @@ await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie
   // klucza Resend, więc wysyłka kończy się błędem konfiguracji — ale wiersz w dzienniku
   // powstaje dopiero PO wygenerowaniu PDF w workerd, więc to też sprawdza generator.
   sprawdz(/kopią wniosku w PDF/.test(potw), "potwierdzenie informuje o mailu z PDF, dystrybutorem i RODO");
+  const baner = page.locator("a[data-baner]");
+  const hrefBanera = await baner.getAttribute("href");
+  const srcBanera = await baner.locator("img").getAttribute("src");
+  sprawdz(/^https:\/\/utratadochodu\.pl\/\?utm_source=wnioski&utm_medium=display&utm_campaign=thankyou&utm_content=wnioskibeauty&utm_term=[a-z]+$/.test(hrefBanera ?? ""), "baner na stronie „Dziękujemy”: link z UTM", hrefBanera);
+  sprawdz(/^https:\/\/ergo\.auraexpert\.pl\/banery\/[a-z]+\.png$/.test(srcBanera ?? "") && srcBanera.includes(hrefBanera.split("utm_term=")[1]), "baner: grafika z listy, utm_term = nazwa grafiki", srcBanera);
+  sprawdz((await baner.getAttribute("target")) === "_blank" && /noopener/.test(await baner.getAttribute("rel")), "baner otwiera się w nowej karcie (noopener)");
   const maile = sql(`select e.typ, e.do_kogo, e.status, coalesce(e.blad,'') from mienie_emaile e join mienie_wnioski w on w.id=e.wniosek_id
                      where w.form_token='${token}' order by e.id`).split("\n").map((w) => w.split("|"));
   const mailKlienta = maile.find((m) => m[0] === "potwierdzenie_klienta");

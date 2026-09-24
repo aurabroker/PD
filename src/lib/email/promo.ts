@@ -1,15 +1,36 @@
 /**
- * Baner w mailu z potwierdzeniem złożenia wniosku.
+ * Baner utratadochodu.pl — strona „Dziękujemy” po złożeniu wniosku i (opcjonalnie) mail.
  *
- * Obraz musi leżeć pod publicznym adresem (klienci poczty nie pokazują
- * obrazków z załączników inline tak samo) — trzymamy go w public/email/
- * i podajemy pełny adres aplikacji. `obraz: null` = baner wyłączony.
- * Wiele programów pocztowych domyślnie blokuje obrazki, dlatego alt
- * jest pełnym komunikatem, a link działa też bez obrazka.
+ * Grafiki leżą na ergo.auraexpert.pl; przy każdym wyświetleniu losujemy jedną.
+ * Nazwa grafiki trafia do utm_term, żeby w analityce było widać, która działa.
+ * Wiele programów pocztowych domyślnie blokuje obrazki, dlatego alt jest
+ * pełnym komunikatem, a link działa też bez obrazka.
+ *
+ * W mailu baner jest WYŁĄCZONY (`wMailu: false`): reklama innej usługi w mailu
+ * transakcyjnym to informacja handlowa, która wymaga wcześniejszej zgody odbiorcy.
  */
-export const PROMO: { obraz: string | null; href: string; alt: string; szerokosc: number } = {
-  obraz: null, // np. "/email/baner-utratadochodu.jpg"
-  href: "https://utratadochodu.pl/?utm_source=email&utm_medium=display&utm_campaign=thankyou&utm_content=wnioskibeauty",
+export const BANERY = [
+  "programista", "balerina", "aktor", "architekt", "dentysta", "przedsiebiorca",
+  "nurkowanie", "jacht", "narty", "rodzina", "podroze", "dom",
+].map((nazwa) => ({ nazwa, url: `https://ergo.auraexpert.pl/banery/${nazwa}.png` }));
+
+export const PROMO = {
+  wMailu: false,
   alt: "Ubezpieczenie od utraty dochodu — utratadochodu.pl",
   szerokosc: 544,
 };
+
+export type Baner = { obraz: string; href: string; alt: string; szerokosc: number };
+
+/** Losowy baner z linkiem oznaczonym UTM dla danego miejsca wyświetlenia. */
+export function losujBaner(zrodlo: "email" | "strona"): Baner {
+  const b = BANERY[Math.floor(Math.random() * BANERY.length)];
+  const utm = new URLSearchParams({
+    utm_source: zrodlo === "email" ? "email" : "wnioski",
+    utm_medium: "display",
+    utm_campaign: "thankyou",
+    utm_content: "wnioskibeauty",
+    utm_term: b.nazwa,
+  });
+  return { obraz: b.url, href: `https://utratadochodu.pl/?${utm}`, alt: PROMO.alt, szerokosc: PROMO.szerokosc };
+}
