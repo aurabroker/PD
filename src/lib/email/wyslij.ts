@@ -47,7 +47,8 @@ async function zapiszWDzienniku(wpis: {
 }
 
 export async function wyslijEmail(o: {
-  do: string;
+  /** Jeden adres albo kilka (zespół) — wtedy jedna wiadomość, adresaci widzą się nawzajem. */
+  do: string | string[];
   temat: string;
   html: string;
   tekst: string;
@@ -56,6 +57,8 @@ export async function wyslijEmail(o: {
   replyTo?: string;
   zalaczniki?: Zalacznik[];
 }): Promise<WynikWysylki> {
+  const adresaci = Array.isArray(o.do) ? o.do : [o.do];
+  const doKogo = adresaci.join(", ");
   const klucz = process.env.RESEND_API_KEY;
   const nadawca = process.env.RESEND_SENDER;
 
@@ -69,7 +72,7 @@ export async function wyslijEmail(o: {
         headers: { Authorization: `Bearer ${klucz}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           from: nadawca,
-          to: [o.do],
+          to: adresaci,
           subject: o.temat,
           html: o.html,
           text: o.tekst,
@@ -89,7 +92,7 @@ export async function wyslijEmail(o: {
     }
   }
 
-  if (!wynik.ok) console.error(`[email] ${o.typ} → ${o.do}:`, wynik.blad);
-  await zapiszWDzienniku({ wniosekId: o.wniosekId ?? null, typ: o.typ, doKogo: o.do, wynik });
+  if (!wynik.ok) console.error(`[email] ${o.typ} → ${doKogo}:`, wynik.blad);
+  await zapiszWDzienniku({ wniosekId: o.wniosekId ?? null, typ: o.typ, doKogo, wynik });
   return wynik;
 }

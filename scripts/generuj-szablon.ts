@@ -30,6 +30,27 @@ export const SZABLON_ROZMIAR_BAJTOW = ${plik.length};
 writeFileSync(cel, modul);
 console.log(`Wygenerowano ${path.relative(process.cwd(), cel)} — ${plik.length} B -> ${modul.length} B`);
 
+// --- Zasoby PDF: fonty i dokumenty prawne ---
+//
+// Kopia wniosku w PDF potrzebuje fontu z polskimi znakami (przycięta Liberation
+// Sans, licencja SIL OFL — assets/fonty/), a mail do klienta dołącza informację
+// o dystrybutorze i notę RODO (public/dokumenty/ — te same pliki są publiczne).
+
+const zasoby = {
+  FONT_REGULAR: "assets/fonty/LiberationSans-Regular.subset.ttf",
+  FONT_BOLD: "assets/fonty/LiberationSans-Bold.subset.ttf",
+  DOKUMENT_DYSTRYBUTOR: "public/dokumenty/aura-expert-informacja-o-dystrybutorze.pdf",
+  DOKUMENT_RODO: "public/dokumenty/aura-expert-nota-rodo.pdf",
+};
+const celZasobow = path.join(process.cwd(), "src", "lib", "pdf", "zasoby.generated.ts");
+let modulZasobow = `// PLIK GENEROWANY — nie edytuj. Zrodlo: scripts/generuj-szablon.ts\n\n`;
+for (const [nazwa, sciezka] of Object.entries(zasoby)) {
+  const bajty = readFileSync(path.join(process.cwd(), sciezka));
+  modulZasobow += `/** ${sciezka} (${bajty.length} B) */\nexport const ${nazwa} = "${bajty.toString("base64")}";\n\n`;
+}
+writeFileSync(celZasobow, modulZasobow);
+console.log(`Wygenerowano ${path.relative(process.cwd(), celZasobow)} — ${Object.keys(zasoby).length} zasoby`);
+
 // --- Znacznik wersji ---
 //
 // Identyfikator wersji Workera w panelu Cloudflare nie mowi nic o tym, ktory

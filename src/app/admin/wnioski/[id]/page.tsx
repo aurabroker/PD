@@ -31,6 +31,11 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
           <p className="mt-1 text-stone-600">{dane.nazwa_firmy}</p>
         </div>
         <div className="flex gap-2">
+          {meta.status !== "roboczy" && (
+            <a href={`/api/wniosek/${meta.form_token}/pdf`} className="przycisk-drugi">
+              Pobierz PDF
+            </a>
+          )}
           <a href={`/api/wniosek/${meta.form_token}/excel`} className="przycisk-drugi">
             Pobierz .xlsx
           </a>

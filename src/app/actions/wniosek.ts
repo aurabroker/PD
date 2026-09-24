@@ -13,6 +13,8 @@ import { pustyWniosek, wniosekDoZlozeniaSchema, wniosekRoboczySchema } from "@/l
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 import { utworzWniosek, zapiszWniosek } from "@/lib/wnioski";
+import { powiadomOZlozeniu } from "@/lib/powiadomienia";
+import { adresAplikacji } from "@/lib/adres-aplikacji";
 import { STATUS } from "@/lib/slowniki";
 
 export type WynikAkcji =
@@ -116,12 +118,18 @@ export async function akcjaZlozWniosek(token: string, dane: unknown): Promise<Wy
     };
   }
 
+  let wniosekId: string;
   try {
-    await zapiszWniosek(token, wynik.data, { zloz: true });
+    ({ id: wniosekId } = await zapiszWniosek(token, wynik.data, { zloz: true }));
   } catch (e) {
     console.error("[akcjaZlozWniosek] blad zapisu:", e);
     return { ok: false, blad: e instanceof Error ? e.message : "Nie udało się złożyć wniosku." };
   }
+
+  // Maile (klient + zespół) wysyłamy przed przekierowaniem, żeby Worker nie
+  // zakończył pracy w połowie wysyłki. Funkcja nie rzuca — błąd wysyłki
+  // trafia do dziennika i do Health, a wniosek pozostaje złożony.
+  await powiadomOZlozeniu(wniosekId, await adresAplikacji());
 
   redirect(`/wniosek/${token}/zlozony`);
 }

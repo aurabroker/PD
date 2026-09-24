@@ -13,8 +13,8 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 
 | | Co sprawdza |
 |---|---|
-| T1 | pełna ścieżka: 2 lokalizacje, sprzęt, szkody, polisa, odświeżenie w trakcie, złożenie, pobranie .xlsx |
-| T2 | autozapis wniosku z samą nazwą firmy |
+| T1 | pełna ścieżka: 2 lokalizacje, sprzęt, szkody, polisa, odświeżenie w trakcie, złożenie, maile po złożeniu (klient + zespół), kopia PDF (treść, polskie znaki, stopka), pobranie .xlsx |
+| T2 | autozapis wniosku z samą nazwą firmy; PDF wersji roboczej niedostępny |
 | T3 | błędny NIP nie blokuje zapisu reszty danych |
 | T4 | złożenie pustego wniosku — komunikaty i przejście do pola z błędem |
 | T5 | wyścig zapisów w jednej karcie |

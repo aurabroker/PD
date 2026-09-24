@@ -18,6 +18,7 @@ import { Pole, PoleKwota, PoleObszar, PoleTakNie, PoleWybor, Sekcja } from "@/co
 import { zl } from "@/lib/format";
 import KrokLokalizacja from "./KrokLokalizacja";
 import WeryfikacjaRegon from "./WeryfikacjaRegon";
+import { TRESC_ZGODY } from "@/lib/dystrybutor";
 import { TabelaSzkod, WykazElektroniki, WykazSprzetuMedycznego } from "./KrokiPomocnicze";
 
 type Props = {
@@ -503,11 +504,11 @@ function KrokPodsumowanie() {
 
         <div className="mt-5 space-y-3">
           <PoleTakNie
-            etykieta="Oświadczam, że wszystkie informacje podane we wniosku są zgodne z prawdą i odzwierciedlają rzeczywisty stan faktyczny."
+            etykieta={TRESC_ZGODY.prawdziwosc}
             rejestracja={register("zgoda_prawdziwosc")} />
 
           <PoleTakNie
-            etykieta="Wyrażam zgodę na przetwarzanie moich danych osobowych przez Aura Expert sp. z o.o. w celu przygotowania oferty ubezpieczenia, zgodnie z RODO."
+            etykieta={TRESC_ZGODY.rodo}
             rejestracja={register("zgoda_rodo")} />
         </div>
       </Sekcja>

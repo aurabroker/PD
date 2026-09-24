@@ -1,4 +1,5 @@
 import { zl } from "../format";
+import { DYSTRYBUTOR } from "../dystrybutor";
 
 /**
  * Mail do klienta po złożeniu wniosku.
@@ -17,7 +18,8 @@ export type DanePotwierdzenia = {
   sumaLaczna: number;
   zakres: string[];
   zlozono: Date;
-  nazwaZalacznika: string;
+  /** Nazwy plików w załączniku: kopia wniosku (PDF), informacja o dystrybutorze, nota RODO. */
+  zalaczniki: string[];
 };
 
 export type Wiadomosc = { temat: string; html: string; tekst: string };
@@ -54,9 +56,27 @@ function wiersz(etykieta: string, wartoscHtml: string): string {
   </tr>`;
 }
 
+const D = DYSTRYBUTOR;
+
+/** Skrót informacji o dystrybutorze — pełna wersja jest w załączonym PDF. */
+export const INFORMACJA_O_DYSTRYBUTORZE =
+  `${D.nazwa}, ${D.adres}, jest agentem ubezpieczeniowym wpisanym do rejestru pośredników ubezpieczeniowych ` +
+  `prowadzonego przez KNF pod numerem ${D.knf} (możesz to sprawdzić na ${D.rejestrKnf.replace("https://", "")}). ` +
+  `KRS ${D.krs}, NIP ${D.nip}, REGON ${D.regon}. Kontakt: ${D.email}, tel. ${D.telefon}. ` +
+  `Reklamacje: ${D.reklamacje}. Pełna informacja o dystrybutorze — w załączniku.`;
+
+/** Klauzula informacyjna — zgodna z notą RODO Aura Expert (pełna nota w załączniku). */
+export const KLAUZULA_RODO =
+  `Administratorem Twoich danych osobowych jest ${D.nazwa} z siedzibą w Warszawie (${D.adres}). ` +
+  `Dane podane we wniosku przetwarzamy na podstawie Twojej zgody oraz w celu podjęcia działań przed zawarciem umowy ubezpieczenia, ` +
+  `czyli żeby przygotować ofertę; w tym zakresie możemy je przekazać zakładom ubezpieczeń. ` +
+  `Masz prawo dostępu do danych, ich sprostowania, usunięcia, ograniczenia przetwarzania, przenoszenia, sprzeciwu, ` +
+  `cofnięcia zgody w dowolnym momencie (bez wpływu na zgodność z prawem wcześniejszego przetwarzania) oraz skargi do Prezesa UODO. ` +
+  `Kontakt z Inspektorem Ochrony Danych: ${D.iod}. Pełna nota informacyjna RODO — w załączniku.`;
+
 export function mailPotwierdzenieKlienta(d: DanePotwierdzenia): Wiadomosc {
   const temat = `Wniosek ${d.nrReferencyjny} przyjęty — ubezpieczenie majątkowe`;
-  const zapowiedz = "Dziękujemy. Wniosek trafił do agenta Aura Expert, kopię przesyłamy w załączniku.";
+  const zapowiedz = "Dziękujemy. Wniosek trafił do agenta Aura Expert, kopię w PDF przesyłamy w załączniku.";
 
   const lokalizacjeHtml = d.lokalizacje
     .map(
@@ -150,19 +170,20 @@ export function mailPotwierdzenieKlienta(d: DanePotwierdzenia): Wiadomosc {
     <tr><td style="padding:16px 28px 24px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px dashed ${KOLOR.linia};border-radius:8px;">
         <tr><td style="${FONT}padding:12px 16px;font-size:13px;line-height:19px;color:${KOLOR.szary};">
-          📎 W załączniku: <strong style="color:${KOLOR.tekst};">${h(d.nazwaZalacznika)}</strong> — kopia wniosku do Twojej dokumentacji.
-          Widzisz błąd? Odpowiedz na tę wiadomość, a agent go poprawi.
+          <strong style="color:${KOLOR.tekst};">W załącznikach:</strong><br>
+          ${d.zalaczniki.map((z) => `&bull;&nbsp;${h(z)}`).join("<br>")}
+          <div style="margin-top:8px;">Pierwszy plik to kopia wniosku do Twojej dokumentacji. Widzisz błąd? Odpowiedz na tę wiadomość, a agent go poprawi.</div>
         </td></tr>
       </table>
     </td></tr>
 
     <tr><td style="background:${KOLOR.tlo};padding:18px 28px;border-top:1px solid ${KOLOR.linia};">
-      <p style="${FONT}margin:0 0 6px;font-size:12px;line-height:17px;color:${KOLOR.szary};">
-        Aura Expert sp. z o.o. · wiadomość wysłana automatycznie po złożeniu wniosku ${h(d.nrReferencyjny)}.
-      </p>
+      <p style="${FONT}margin:0 0 4px;font-size:12px;font-weight:600;color:${KOLOR.szary};">Informacja o dystrybutorze</p>
+      <p style="${FONT}margin:0 0 12px;font-size:11px;line-height:16px;color:${KOLOR.szary};">${h(INFORMACJA_O_DYSTRYBUTORZE)}</p>
+      <p style="${FONT}margin:0 0 4px;font-size:12px;font-weight:600;color:${KOLOR.szary};">Ochrona danych osobowych (RODO)</p>
+      <p style="${FONT}margin:0 0 12px;font-size:11px;line-height:16px;color:${KOLOR.szary};">${h(KLAUZULA_RODO)}</p>
       <p style="${FONT}margin:0;font-size:11px;line-height:16px;color:${KOLOR.szaryJasny};">
-        Administratorem Twoich danych jest Aura Expert sp. z o.o. Przetwarzamy je w celu przygotowania oferty ubezpieczenia, zgodnie ze zgodą udzieloną we wniosku (RODO).
-        Jeśli wniosek nie pochodzi od Ciebie, odpowiedz na tę wiadomość.
+        Wiadomość wysłana automatycznie po złożeniu wniosku ${h(d.nrReferencyjny)}. Jeśli wniosek nie pochodzi od Ciebie, odpowiedz na tę wiadomość.
       </p>
     </td></tr>
 
@@ -190,11 +211,16 @@ export function mailPotwierdzenieKlienta(d: DanePotwierdzenia): Wiadomosc {
     `2. Przygotujemy ofertę dopasowaną do Twojej działalności i lokalizacji.`,
     `3. Prześlemy ją na ten adres e-mail — decyzję podejmujesz Ty.`,
     ``,
-    `W załączniku: ${d.nazwaZalacznika} — kopia wniosku. Widzisz błąd? Odpowiedz na tę wiadomość.`,
+    `W załącznikach:`,
+    ...d.zalaczniki.map((z) => `- ${z}`),
+    `Pierwszy plik to kopia wniosku. Widzisz błąd? Odpowiedz na tę wiadomość.`,
     ``,
     `--`,
-    `Aura Expert sp. z o.o.`,
-    `Administratorem Twoich danych jest Aura Expert sp. z o.o. Przetwarzamy je w celu przygotowania oferty ubezpieczenia (RODO).`,
+    `INFORMACJA O DYSTRYBUTORZE`,
+    INFORMACJA_O_DYSTRYBUTORZE,
+    ``,
+    `OCHRONA DANYCH OSOBOWYCH (RODO)`,
+    KLAUZULA_RODO,
   ].join("\n");
 
   return { temat, html, tekst };

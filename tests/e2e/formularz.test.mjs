@@ -174,6 +174,15 @@ async function uruchom(nazwa, fn, browser) {
 
 const browser = await chromium.launch(CHROME ? { executablePath: CHROME } : {});
 
+// Aktywny admin od początku: złożenie wniosku (T1) wysyła powiadomienie do zespołu.
+const ADMIN = { id: "00000000-0000-4000-8000-00000000a001", email: "admin@e2e.local", haslo: "Haslo-Admina-123" };
+sql(`insert into auth.users (id, email, encrypted_password) values ('${ADMIN.id}', '${ADMIN.email}', '${ADMIN.haslo}')
+     on conflict (email) do update set encrypted_password = excluded.encrypted_password`);
+sql(`insert into public.mienie_agenci (user_id, email, imie_nazwisko, rola, aktywny)
+     values ('${ADMIN.id}', '${ADMIN.email}', 'Ada Administratorka', 'admin', true)
+     on conflict (user_id) do update set rola = 'admin', aktywny = true`);
+
+
 // ---------------------------------------------------------------------------
 await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie", async ({ page }) => {
   const token = await nowyWniosek(page);
@@ -266,6 +275,39 @@ await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie
   sprawdz(/(PD|PD\/EEI|EEI)\/\d{8}\/[A-HJ-NP-Z2-9]{6}/.test(potw), "numer referencyjny (PD/…) widoczny na potwierdzeniu", potw.slice(0, 200));
   sprawdzNumer(token, "T1");
 
+  // Maile po złożeniu: klient (kopia PDF + dystrybutor + RODO) i zespół. W replice nie ma
+  // klucza Resend, więc wysyłka kończy się błędem konfiguracji — ale wiersz w dzienniku
+  // powstaje dopiero PO wygenerowaniu PDF w workerd, więc to też sprawdza generator.
+  sprawdz(/kopią wniosku w PDF/.test(potw), "potwierdzenie informuje o mailu z PDF, dystrybutorem i RODO");
+  const maile = sql(`select e.typ, e.do_kogo, e.status, coalesce(e.blad,'') from mienie_emaile e join mienie_wnioski w on w.id=e.wniosek_id
+                     where w.form_token='${token}' order by e.id`).split("\n").map((w) => w.split("|"));
+  const mailKlienta = maile.find((m) => m[0] === "potwierdzenie_klienta");
+  const mailZespolu = maile.find((m) => m[0] === "nowy_wniosek_agent");
+  sprawdz(maile.length === 2, "DB: dokładnie 2 wysyłki po złożeniu (klient + zespół)", JSON.stringify(maile));
+  sprawdz(mailKlienta?.[1] === "test@salon-testowy.pl", "mail do klienta na adres z wniosku", JSON.stringify(mailKlienta));
+  sprawdz(Boolean(mailZespolu?.[1].split(", ").includes(ADMIN.email)), "powiadomienie trafia do aktywnego admina", JSON.stringify(mailZespolu));
+  sprawdz(maile.every((m) => m[2] === "wyslany" || /Brak konfiguracji/.test(m[3])), "wysyłka bez wyjątków (w replice: tylko brak klucza Resend)", JSON.stringify(maile));
+
+  // Kopia PDF do pobrania z potwierdzenia
+  const [dlPdf] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Pobierz kopię (PDF)" }).click()]);
+  const sciezkaPdf = path.join(TMP, "e2e-wniosek.pdf");
+  await dlPdf.saveAs(sciezkaPdf);
+  const pdf = readFileSync(sciezkaPdf);
+  const nrT1 = sql(`select nr_referencyjny from mienie_wnioski where form_token='${token}'`);
+  sprawdz(pdf.subarray(0, 5).toString() === "%PDF-" && pdf.length > 10000, "pobrano kopię PDF", `${pdf.length} B`);
+  sprawdz(dlPdf.suggestedFilename() === `Wniosek ${nrT1.replace(/\//g, "-")}.pdf`, "nazwa pliku PDF z numerem wniosku", dlPdf.suggestedFilename());
+  let tekstPdf = "";
+  try { tekstPdf = execSync(`pdftotext -layout ${JSON.stringify(sciezkaPdf)} -`, { encoding: "utf-8" }); } catch { /* brak poppler-utils */ }
+  if (tekstPdf) {
+    sprawdz(tekstPdf.includes(nrT1), "PDF: numer wniosku", nrT1);
+    sprawdz(tekstPdf.includes("Salon Testowy Ąę sp. z o.o.") && tekstPdf.includes("Żaneta Łukasiewicz"), "PDF: polskie znaki w danych klienta");
+    sprawdz(/Łączna suma ubezpieczenia\s+1\s?067\s?000 zł\s+178\s?500 zł\s+1\s?245\s?500 zł/.test(tekstPdf.replace(/\u00a0/g, " ")), "PDF: tabela sum (lokalizacje i razem)");
+    sprawdz(tekstPdf.includes("zażółć gęślą jaźń ?"), "PDF: emoji spoza fontu zamienione na „?”, reszta tekstu cała");
+    sprawdz(/Aura Expert sp\. z o\.o\..*KNF 11229690\/A/.test(tekstPdf) && /Strona 1 z \d/.test(tekstPdf), "PDF: stopka dystrybutora i numeracja stron");
+  } else {
+    console.log("  (pdftotext niedostępny — pomijam sprawdzenie treści PDF)");
+  }
+
   // Weryfikacja w bazie
   const [status, wyslano, suma, zakres, med, eei, szk, rodo, data] = sql(
     `select status, wyslano_at is not null, suma_lacznie, jsonb_array_length(zakres), jsonb_array_length(sprzet_medyczny),
@@ -282,7 +324,7 @@ await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie
   sprawdz(uw.includes("zażółć gęślą jaźń 🙂"), "DB: polskie znaki i emoji zapisane bez zniekształceń", uw);
 
   // Pobranie Excela i ponowny import
-  const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: /Pobierz wniosek/ }).click()]);
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: /Pobierz plik \.xlsx/ }).click()]);
   const sciezka = path.join(TMP, "e2e-pobrany.xlsx");
   await dl.saveAs(sciezka);
   sprawdz(readFileSync(sciezka).length > 20000, "pobrano plik .xlsx", `${readFileSync(sciezka).length} B`);
@@ -320,6 +362,8 @@ await uruchom("T2 autozapis niekompletnego wniosku (klient wpisał tylko nazwę)
   sprawdz(stan === "zapisano", "wersja robocza zapisuje się mimo braku pozostałych pól", `wskaźnik: ${stan}`);
   const w = sql(`select nazwa_firmy from mienie_wnioski where form_token='${token}'`);
   sprawdz(w === "Tylko nazwa", "DB: nazwa zapisana w wersji roboczej", w);
+  const pdfRoboczy = await fetch(`${APP}/api/wniosek/${token}/pdf`);
+  sprawdz(pdfRoboczy.status === 409, "PDF wersji roboczej niedostępny (409)", String(pdfRoboczy.status));
 }, browser);
 
 // ---------------------------------------------------------------------------
@@ -676,13 +720,6 @@ await uruchom("T16 przerobiony szablon: import przechodzi, agent widzi różnice
 // ===========================================================================
 // PANEL AGENTA — logowanie przez atrapę GoTrue w tests/e2e/proxy-supabase.mjs
 // ===========================================================================
-const ADMIN = { id: "00000000-0000-4000-8000-00000000a001", email: "admin@e2e.local", haslo: "Haslo-Admina-123" };
-sql(`insert into auth.users (id, email, encrypted_password) values ('${ADMIN.id}', '${ADMIN.email}', '${ADMIN.haslo}')
-     on conflict (email) do update set encrypted_password = excluded.encrypted_password`);
-sql(`insert into public.mienie_agenci (user_id, email, imie_nazwisko, rola, aktywny)
-     values ('${ADMIN.id}', '${ADMIN.email}', 'Ada Administratorka', 'admin', true)
-     on conflict (user_id) do update set rola = 'admin', aktywny = true`);
-
 async function zaloguj(page, email, haslo) {
   await page.goto(APP + "/login");
   await page.fill("#email", email);

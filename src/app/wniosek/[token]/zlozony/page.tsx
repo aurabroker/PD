@@ -19,6 +19,10 @@ export default async function StronaZlozony({ params }: { params: Promise<{ toke
           Wniosek <strong>{wynik.meta.nr_referencyjny}</strong> trafił do naszych agentów.
           Skontaktujemy się z Tobą na adres {wynik.meta.email_kontaktowy}.
         </p>
+        <p className="mt-2 text-sm text-stone-500">
+          Na ten adres wysłaliśmy też potwierdzenie z kopią wniosku w PDF, informacją o dystrybutorze
+          i notą RODO. Nie widzisz wiadomości? Sprawdź folder spam.
+        </p>
 
         <dl className="mt-6 space-y-2 rounded-lg bg-stone-50 p-4 text-sm">
           <div className="flex justify-between">
@@ -35,9 +39,24 @@ export default async function StronaZlozony({ params }: { params: Promise<{ toke
           </div>
         </dl>
 
-        <a href={`/api/wniosek/${token}/excel`} className="przycisk-glowny mt-6 w-full">
-          Pobierz wniosek (.xlsx)
-        </a>
+        <div className="mt-6 grid gap-2 sm:grid-cols-2">
+          <a href={`/api/wniosek/${token}/pdf`} className="przycisk-glowny w-full">
+            Pobierz kopię (PDF)
+          </a>
+          <a href={`/api/wniosek/${token}/excel`} className="przycisk-drugi w-full">
+            Pobierz plik .xlsx
+          </a>
+        </div>
+        <p className="mt-4 text-xs text-stone-500">
+          Dystrybutor:{" "}
+          <a href="/dokumenty/aura-expert-informacja-o-dystrybutorze.pdf" className="underline hover:text-marka-700">
+            informacja o Aura Expert sp. z o.o.
+          </a>{" "}
+          ·{" "}
+          <a href="/dokumenty/aura-expert-nota-rodo.pdf" className="underline hover:text-marka-700">
+            nota informacyjna RODO
+          </a>
+        </p>
       </div>
     </main>
   );

@@ -13,4 +13,5 @@ next-env.d.ts
 cloudflare-env.d.ts
 src/lib/excel/szablon.generated.ts
 src/lib/wersja.generated.ts
+src/lib/pdf/zasoby.generated.ts
 .wrangler-sekrety.json

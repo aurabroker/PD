@@ -1,6 +1,6 @@
 "use server";
 
-import { headers } from "next/headers";
+import { adresAplikacji } from "@/lib/adres-aplikacji";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { wymaganyAdmin } from "@/lib/autoryzacja";
@@ -11,14 +11,6 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export type WynikAgenta =
   | { ok: true; komunikat: string; link?: string; emailWyslany?: boolean }
   | { ok: false; blad: string };
-
-/** Adres aplikacji do linków w mailach — z żądania admina, nie ze zmiennej builda. */
-async function adresAplikacji(): Promise<string> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
-  const protokol = h.get("x-forwarded-proto") ?? (host.startsWith("127.0.0.1") || host.startsWith("localhost") ? "http" : "https");
-  return `${protokol}://${host}`;
-}
 
 /**
  * Jednorazowy link do ustawienia hasła. Generujemy go kluczem serwisowym
