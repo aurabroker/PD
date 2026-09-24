@@ -41,8 +41,8 @@ const PNG_1X1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0l
 
 async function nowaStrona(browser, opcje = {}) {
   const ctx = await browser.newContext({ acceptDownloads: true, locale: "pl-PL", ...opcje });
-  // Banery utratadochodu.pl leżą na zewnętrznej domenie — w teście podstawiamy obrazek 1×1.
-  await ctx.route("https://ergo.auraexpert.pl/**", (r) => r.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }));
+  // Grafiki banera app pobiera z ergo.auraexpert.pl (w replice niedostępne) — w przeglądarce podstawiamy obrazek 1×1.
+  await ctx.route(/\/grafika\/[a-z]+\.png$/, (r) => r.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }));
   const page = await ctx.newPage();
   const bledy = [];
   page.on("pageerror", (e) => bledy.push(`pageerror na ${page.url().replace(APP, "")}: ${e.message}`));
@@ -283,11 +283,13 @@ await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie
   // klucza Resend, więc wysyłka kończy się błędem konfiguracji — ale wiersz w dzienniku
   // powstaje dopiero PO wygenerowaniu PDF w workerd, więc to też sprawdza generator.
   sprawdz(/kopią wniosku w PDF/.test(potw), "potwierdzenie informuje o mailu z PDF, dystrybutorem i RODO");
-  const baner = page.locator("a[data-baner]");
+  const baner = page.locator("a[data-oferta]");
   const hrefBanera = await baner.getAttribute("href");
   const srcBanera = await baner.locator("img").getAttribute("src");
   sprawdz(/^https:\/\/utratadochodu\.pl\/\?utm_source=wnioski&utm_medium=display&utm_campaign=thankyou&utm_content=wnioskibeauty&utm_term=[a-z]+$/.test(hrefBanera ?? ""), "baner na stronie „Dziękujemy”: link z UTM", hrefBanera);
-  sprawdz(/^https:\/\/ergo\.auraexpert\.pl\/banery\/[a-z]+\.png$/.test(srcBanera ?? "") && srcBanera.includes(hrefBanera.split("utm_term=")[1]), "baner: grafika z listy, utm_term = nazwa grafiki", srcBanera);
+  sprawdz(/^\/grafika\/[a-z]+\.png$/.test(srcBanera ?? "") && srcBanera.includes(hrefBanera.split("utm_term=")[1]), "baner: grafika z naszej domeny (odporna na blokery), utm_term = nazwa grafiki", srcBanera);
+  await page.waitForFunction(() => document.querySelector("a[data-oferta] img")?.complete, null, { timeout: 10000 }).catch(() => {});
+  sprawdz((await baner.getAttribute("data-oferta-stan")) === "grafika", "baner: grafika wyświetlona");
   sprawdz((await baner.getAttribute("target")) === "_blank" && /noopener/.test(await baner.getAttribute("rel")), "baner otwiera się w nowej karcie (noopener)");
   const maile = sql(`select e.typ, e.do_kogo, e.status, coalesce(e.blad,'') from mienie_emaile e join mienie_wnioski w on w.id=e.wniosek_id
                      where w.form_token='${token}' order by e.id`).split("\n").map((w) => w.split("|"));
@@ -948,15 +950,22 @@ await uruchom("T21 statystyki: liczby zgodne z bazą", async ({ page }) => {
 await uruchom("T22 baner: grafika niedostępna → karta tekstowa z tym samym linkiem", async ({ page, bledy }) => {
   const id = await zlozonyWniosek(page, "T22 Salon Baner");
   const token = sql(`select form_token from mienie_wnioski where id='${id}'`);
-  await page.route("https://ergo.auraexpert.pl/**", (r) => r.fulfill({ status: 404, body: "brak" }));
+  await page.route(/\/grafika\/[a-z]+\.png$/, (r) => r.fulfill({ status: 502, body: "brak" }));
   await page.goto(`${APP}/wniosek/${token}/zlozony`);
-  const baner = page.locator("a[data-baner]");
-  await page.waitForFunction(() => document.querySelector("a[data-baner]")?.getAttribute("data-baner-stan") === "tekst", null, { timeout: 10000 }).catch(() => {});
-  sprawdz((await baner.getAttribute("data-baner-stan")) === "tekst", "brak grafiki → karta tekstowa zamiast pustej ramki");
+  const baner = page.locator("a[data-oferta]");
+  await page.waitForFunction(() => document.querySelector("a[data-oferta]")?.getAttribute("data-oferta-stan") === "tekst", null, { timeout: 10000 }).catch(() => {});
+  sprawdz((await baner.getAttribute("data-oferta-stan")) === "tekst", "brak grafiki → karta tekstowa zamiast pustej ramki");
   sprawdz(await baner.getByText("Ubezpieczenie od utraty dochodu").isVisible(), "karta tekstowa widoczna");
   sprawdz(/^https:\/\/utratadochodu\.pl\/\?utm_source=wnioski/.test((await baner.getAttribute("href")) ?? ""), "karta tekstowa prowadzi do utratadochodu.pl z UTM");
   // 404 grafiki to celowo wywołany błąd tego scenariusza, nie awaria aplikacji.
-  for (let i = bledy.length - 1; i >= 0; i--) if (/ergo\.auraexpert\.pl|404 \(\)|status of 404/.test(bledy[i])) bledy.splice(i, 1);
+  for (let i = bledy.length - 1; i >= 0; i--) if (/\/grafika\/|status of 502/.test(bledy[i])) bledy.splice(i, 1);
+
+  // Trasa /grafika: tylko nazwy z listy (nie otwarte proxy); źródło niedostępne → 502, nie awaria.
+  sprawdz((await fetch(`${APP}/grafika/nieznany.png`)).status === 404, "/grafika: nazwa spoza listy → 404");
+  sprawdz((await fetch(`${APP}/grafika/..%2F..%2Fapi%2Fstan`)).status === 404, "/grafika: próba wyjścia poza listę → 404");
+  const g = await fetch(`${APP}/grafika/programista.png`);
+  const typ = g.headers.get("content-type") ?? "";
+  sprawdz((g.status === 200 && typ.startsWith("image/")) || g.status === 502, "/grafika/programista.png: obraz albo 502 (w replice źródło bywa niedostępne)", `${g.status} ${typ}`);
 }, browser);
 
 await browser.close();

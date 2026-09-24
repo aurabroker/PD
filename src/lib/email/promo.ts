@@ -22,7 +22,11 @@ export const PROMO = {
 
 export type Baner = { obraz: string; href: string; alt: string; szerokosc: number };
 
-/** Losowy baner z linkiem oznaczonym UTM dla danego miejsca wyświetlenia. */
+/**
+ * Losowy baner z linkiem oznaczonym UTM dla danego miejsca wyświetlenia.
+ * Na stronie grafika idzie z naszej domeny (/grafika/…, patrz app/grafika),
+ * w mailu — bezpośrednio z ergo.auraexpert.pl (klient poczty pobiera ją sam).
+ */
 export function losujBaner(zrodlo: "email" | "strona"): Baner {
   const b = BANERY[Math.floor(Math.random() * BANERY.length)];
   const utm = new URLSearchParams({
@@ -32,5 +36,6 @@ export function losujBaner(zrodlo: "email" | "strona"): Baner {
     utm_content: "wnioskibeauty",
     utm_term: b.nazwa,
   });
-  return { obraz: b.url, href: `https://utratadochodu.pl/?${utm}`, alt: PROMO.alt, szerokosc: PROMO.szerokosc };
+  const obraz = zrodlo === "strona" ? `/grafika/${b.nazwa}.png` : b.url;
+  return { obraz, href: `https://utratadochodu.pl/?${utm}`, alt: PROMO.alt, szerokosc: PROMO.szerokosc };
 }

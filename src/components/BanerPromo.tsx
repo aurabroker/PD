@@ -25,8 +25,8 @@ export default function BanerPromo({ baner }: { baner: Baner }) {
       target="_blank"
       rel="noopener noreferrer"
       className="mt-6 block overflow-hidden rounded-xl border border-stone-200 bg-white transition hover:border-marka-300"
-      data-baner={baner.obraz}
-      data-baner-stan={blad ? "tekst" : "grafika"}
+      data-oferta={baner.obraz}
+      data-oferta-stan={blad ? "tekst" : "grafika"}
     >
       {blad ? (
         <span className="flex items-center justify-between gap-4 p-5">
