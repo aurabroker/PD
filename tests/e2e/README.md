@@ -35,6 +35,7 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 | T20 | dezaktywacja agenta: dostęp odcięty od razu, otwarte wnioski wracają do puli, admin nie zablokuje sam siebie |
 | T21 | statystyki: liczby zgodne z bazą, wszystkie okresy |
 | T22 | baner na stronie „Dziękujemy”: gdy grafika się nie wczyta, karta tekstowa z tym samym linkiem |
+| T23 | strona główna: logo Aura Expert w nagłówku, favicon, sekcja „Nasze serwisy” (4 serwisy, Beauty Polisa „Wkrótce”) |
 
 Korpus złośliwych plików do T14 generuje `tests/e2e/generuj-zlosliwe.mjs`
 (bez zależności, sam z szablonu i wypełnionego wniosku). Można go uruchomić

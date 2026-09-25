@@ -71,7 +71,7 @@ export default function FormularzImportu() {
           Plik wczytany, ale {ostrzezenia.length}{" "}
           {ostrzezenia.length === 1 ? "pozycja wymaga" : "pozycji wymaga"} uwagi:
         </p>
-        <ul className="mt-2 space-y-1 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+        <ul aria-label="Ostrzeżenia importu" className="mt-2 space-y-1 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
           {ostrzezenia.map((o, i) => (
             <li key={i}>
               <span className="font-medium">{o.arkusz}</span> — {o.opis}

@@ -4,6 +4,7 @@ import { zl } from "@/lib/format";
 import { sumaWniosku } from "@/lib/schema";
 import { losujBaner } from "@/lib/email/promo";
 import BanerPromo from "@/components/BanerPromo";
+import SerwisyAura from "@/components/SerwisyAura";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,8 @@ export default async function StronaZlozony({ params }: { params: Promise<{ toke
       </div>
 
       <BanerPromo baner={baner} />
+
+      <SerwisyAura waska />
     </main>
   );
 }

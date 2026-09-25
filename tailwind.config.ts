@@ -5,14 +5,19 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Niebieski z logo Aura Expert (#00a4dc). Tekst i przyciski: 700
+        // (kontrast z białym 5,1:1 — WCAG AA), 500 tylko na akcenty graficzne.
         marka: {
-          50: "#fdf5f3",
-          100: "#fbe8e4",
-          200: "#f7d5cd",
-          400: "#dc9b8a",
-          600: "#a65a45",
-          700: "#8a4838",
-          900: "#5c3025",
+          50: "#eef9fd",
+          100: "#d7f1fb",
+          200: "#b0e3f5",
+          300: "#7fd0ee",
+          400: "#3db8e4",
+          500: "#00a4dc",
+          600: "#0090c2",
+          700: "#00769f",
+          800: "#075f82",
+          900: "#0a4a66",
         },
       },
     },

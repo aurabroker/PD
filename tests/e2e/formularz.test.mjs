@@ -43,6 +43,8 @@ async function nowaStrona(browser, opcje = {}) {
   const ctx = await browser.newContext({ acceptDownloads: true, locale: "pl-PL", ...opcje });
   // Grafiki banera app pobiera z banery.auraexpert.pl (w replice niedostępne) — w przeglądarce podstawiamy obrazek 1×1.
   await ctx.route(/\/grafika\/[a-z]+(-600)?\.(png|jpg|webp)$/, (r) => r.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }));
+  // Grafiki sekcji „Nasze serwisy” leżą na auraexpert.pl — też podstawiamy.
+  await ctx.route(/^https:\/\/auraexpert\.pl\/images\//, (r) => r.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }));
   const page = await ctx.newPage();
   const bledy = [];
   page.on("pageerror", (e) => bledy.push(`pageerror na ${page.url().replace(APP, "")}: ${e.message}`));
@@ -541,7 +543,7 @@ await uruchom("T10 import pliku z ostrzeżeniami (wartości spoza list, brak e-m
   await page.locator('input[type=file][name="plik"]').setInputFiles(XLSX_Z_OSTRZEZENIAMI);
   await page.getByRole("button", { name: "Wczytaj wniosek z pliku" }).click();
   await page.getByText(/wymaga uwagi/).waitFor({ timeout: 30000 });
-  const lista = await page.locator("ul").first().innerText();
+  const lista = await page.getByRole("list", { name: "Ostrzeżenia importu" }).innerText();
   sprawdz(/Fundacja/.test(lista) && /Kontener/.test(lista), "ostrzeżenia wymieniają obie wartości spoza list", lista.slice(0, 300));
   sprawdz(/email/i.test(lista), "ostrzeżenie o brakującym e-mailu", lista.slice(0, 300));
   await page.getByRole("button", { name: "Przejdź do wniosku i popraw" }).click();
@@ -971,6 +973,25 @@ await uruchom("T22 baner: grafika niedostępna → karta tekstowa z tym samym li
     const typ = g.headers.get("content-type") ?? "";
     sprawdz((g.status === 200 && typ.startsWith("image/")) || g.status === 502, `/grafika/${w}: obraz albo 502 (w replice źródło bywa niedostępne)`, `${g.status} ${typ}`);
   }
+}, browser);
+
+// ---------------------------------------------------------------------------
+await uruchom("T23 strona główna: logo Aura Expert i sekcja „Nasze serwisy”", async ({ page }) => {
+  await page.goto(APP + "/");
+  const logo = page.locator('header img[alt^="Aura Expert"]');
+  sprawdz(await logo.isVisible(), "logo Aura Expert w nagłówku");
+  const odpLogo = await fetch(APP + (await logo.getAttribute("src")));
+  sprawdz(odpLogo.status === 200 && (odpLogo.headers.get("content-type") ?? "").startsWith("image/"), "plik logo dostępny", String(odpLogo.status));
+  const serwisy = page.locator("#serwisy li");
+  sprawdz((await serwisy.count()) === 4, "4 serwisy w sekcji", String(await serwisy.count()));
+  const linki = page.locator("#serwisy a");
+  const hrefy = await linki.evaluateAll((a) => a.map((x) => x.getAttribute("href")));
+  sprawdz(JSON.stringify(hrefy) === JSON.stringify(["https://utratadochodu.pl", "https://ergo.beautypolisa.eu", "https://ergo.auraexpert.pl/"]), "linki do 3 aktywnych serwisów", JSON.stringify(hrefy));
+  sprawdz((await linki.evaluateAll((a) => a.every((x) => x.target === "_blank" && /noopener/.test(x.rel)))), "serwisy otwierają się w nowej karcie (noopener)");
+  const beauty = page.locator("#serwisy li", { hasText: "Beauty Polisa" });
+  sprawdz((await beauty.locator("a").count()) === 0 && (await beauty.getByText("Wkrótce").isVisible()), "Beauty Polisa: „Wkrótce”, bez linku");
+  const ikona = await fetch(APP + "/icon.png");
+  sprawdz(ikona.status === 200, "favicon z symbolem Aura Expert", String(ikona.status));
 }, browser);
 
 await browser.close();

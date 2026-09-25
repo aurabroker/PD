@@ -26,7 +26,7 @@ export default function BladGlobalny({
         <button
           type="button"
           onClick={reset}
-          style={{ marginTop: "1.5rem", padding: "0.625rem 1rem", borderRadius: "0.5rem", border: 0, background: "#8a4838", color: "white", fontSize: "0.875rem", cursor: "pointer" }}
+          style={{ marginTop: "1.5rem", padding: "0.625rem 1rem", borderRadius: "0.5rem", border: 0, background: "#00769f", color: "white", fontSize: "0.875rem", cursor: "pointer" }}
         >
           Spróbuj ponownie
         </button>

@@ -14,12 +14,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <div className="min-h-screen">
           <header className="border-b border-stone-200 bg-white">
-            <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-              <a href="/" className="flex items-baseline gap-2">
-                <span className="text-lg font-semibold tracking-tight text-marka-900">
-                  Aura Expert
+            <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
+              <a href="/" className="flex items-center gap-4" aria-label="Aura Expert — strona główna">
+                {/* eslint-disable-next-line @next/next/no-img-element -- mały statyczny plik, bez optymalizacji Next */}
+                <img
+                  src="/marka/aura-expert-112.webp"
+                  srcSet="/marka/aura-expert-112.webp 2x, /marka/aura-expert-168.webp 3x"
+                  width={112}
+                  height={56}
+                  alt="Aura Expert — zmień agenta na experta"
+                  className="h-12 w-auto sm:h-14"
+                />
+                <span className="hidden border-l border-stone-200 pl-4 text-sm leading-tight text-stone-600 sm:block">
+                  Ubezpieczenie majątkowe
+                  <br />
+                  salonów beauty
                 </span>
-                <span className="text-sm text-stone-500">Ubezpieczenie majątkowe</span>
               </a>
               <a href="/login" className="text-sm text-stone-500 hover:text-marka-700">
                 Panel agenta
