@@ -3,6 +3,7 @@ import { pobierzWniosekPoId } from "@/lib/wnioski";
 import { kontrolaSpojnosci, sumaLokalizacji, sumaWniosku } from "@/lib/schema";
 import { zl } from "@/lib/format";
 import { POZYCJE_SUM, STATUS_ETYKIETY } from "@/lib/slowniki";
+import { jestBrak, tytulLokalizacji } from "@/lib/porzadkowanie";
 import PanelAgenta from "@/components/PanelAgenta";
 import { biezacyAgent } from "@/lib/autoryzacja";
 import { historiaWniosku, type WpisHistorii } from "@/lib/historia";
@@ -34,6 +35,12 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
           {meta.status !== "roboczy" && (
             <a href={`/api/wniosek/${meta.form_token}/pdf`} className="przycisk-drugi">
               Pobierz PDF
+            </a>
+          )}
+          {(dane.sprzet_medyczny.length > 0 || dane.elektronika_eei.length > 0) && (
+            <a href={`/api/admin/wnioski/${meta.id}/sprzet`} className="przycisk-drugi"
+              title="Wykaz sprzętu medycznego i elektroniki — do zapytania ofertowego">
+              Wykaz sprzętu (.xlsx)
             </a>
           )}
           <a href={`/api/wniosek/${meta.form_token}/excel`} className="przycisk-drugi">
@@ -84,7 +91,7 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
           </Karta>
 
           {dane.lokalizacje.map((lok) => (
-            <Karta key={lok.nr} tytul={`Lokalizacja ${lok.nr}${lok.nazwa ? ` — ${lok.nazwa}` : ""}`}>
+            <Karta key={lok.nr} tytul={tytulLokalizacji(lok)}>
               <Siatka pozycje={[
                 ["Adres", lok.adres],
                 ["Typ lokalu", lok.typ_lokalu],
@@ -110,7 +117,7 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
                 ]} />
                 <Lista tytul="Zabezpieczenia antykradzieżowe" pozycje={[
                   lok.alarm_typ && lok.alarm_typ !== "brak" && `alarm: ${lok.alarm_typ}`,
-                  lok.agencja_ochrony && `ochrona: ${lok.agencja_ochrony}`,
+                  lok.agencja_ochrony && !jestBrak(lok.agencja_ochrony) && `ochrona: ${lok.agencja_ochrony}`,
                   lok.agencja_24h && "ochrona 24h",
                   lok.cctv && "monitoring CCTV",
                   lok.sejf_klasa && lok.sejf_klasa !== "brak" && `sejf kl. ${lok.sejf_klasa}`,

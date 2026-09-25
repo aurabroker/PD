@@ -9,6 +9,7 @@ import {
   ALARM_TYP,
   MATERIAL_SCIAN,
   OGRZEWANIE,
+  PIETRO,
   POKRYCIE_DACHU,
   POZYCJE_SUM,
   SEJF_KLASA,
@@ -40,8 +41,13 @@ export default function KrokLokalizacja({ indeks }: { indeks: number }) {
     .filter((u) => Number(u?.lokalizacja) === nr)
     .reduce((acc, u) => acc + (Number(u?.wartosc) || 0), 0);
 
-  const deklarowanyMed = Number(lokalizacja?.suma_sprzet_medyczny) || 0;
-  const deklarowanyEei = Number(lokalizacja?.suma_elektronika_it) || 0;
+  // Sumy sprzętu z wykazu liczy formularz (KreatorWniosku) — tu tylko pokazujemy skąd są.
+  const zWykazu: Partial<Record<(typeof POZYCJE_SUM)[number]["klucz"], string>> = {
+    ...(wykazMed > 0 && { suma_sprzet_medyczny: "Wyliczone z wykazu w kroku „Sprzęt medyczny”" }),
+    ...(wykazEei > 0 && { suma_elektronika_it: "Wyliczone z wykazu w kroku „Elektronika”" }),
+  };
+  const rokTeraz = new Date().getFullYear();
+  const rok = { inputMode: "numeric" as const, min: 1800, max: rokTeraz, placeholder: "np. 1998" };
 
   return (
     <div className="space-y-6">
@@ -52,16 +58,18 @@ export default function KrokLokalizacja({ indeks }: { indeks: number }) {
             rejestracja={register(p("nazwa"))} />
           <Pole etykieta="Adres lokalizacji ubezpieczenia" wymagane
             blad={bledy?.adres} rejestracja={register(p("adres"))} />
-          <PoleWybor etykieta="Typ lokalu" opcje={TYP_LOKALU} rejestracja={register(p("typ_lokalu"))} />
-          <Pole etykieta="Piętro / kondygnacja" podpowiedz="np. 0, 1, -1"
-            rejestracja={register(p("pietro"))} />
-          <Pole etykieta="Powierzchnia (m²)" typ="number" rejestracja={register(p("powierzchnia"))} />
-          <Pole etykieta="Rok budowy" rejestracja={register(p("rok_budowy"))} />
-          <Pole etykieta="Rok ostatniego remontu" rejestracja={register(p("rok_remontu"))} />
-          <PoleWybor etykieta="Materiał ścian" opcje={MATERIAL_SCIAN} rejestracja={register(p("material_scian"))} />
-          <PoleWybor etykieta="Pokrycie dachu" opcje={POKRYCIE_DACHU} rejestracja={register(p("pokrycie_dachu"))} />
-          <PoleWybor etykieta="Stan techniczny" opcje={STAN_TECHNICZNY} rejestracja={register(p("stan_techniczny"))} />
-          <PoleWybor etykieta="Ogrzewanie" opcje={OGRZEWANIE} rejestracja={register(p("ogrzewanie"))} />
+          <PoleWybor etykieta="Typ lokalu" wymagane opcje={TYP_LOKALU} rejestracja={register(p("typ_lokalu"))} />
+          <PoleWybor etykieta="Piętro / kondygnacja" wymagane opcje={PIETRO} rejestracja={register(p("pietro"))} />
+          <Pole etykieta="Powierzchnia (m²)" wymagane typ="number" rejestracja={register(p("powierzchnia"))}
+            atrybuty={{ inputMode: "decimal", min: 1, step: "any" }} />
+          <Pole etykieta="Rok budowy" wymagane typ="number" podpowiedz="Budynku, w którym jest lokal"
+            rejestracja={register(p("rok_budowy"))} atrybuty={rok} />
+          <Pole etykieta="Rok ostatniego remontu" typ="number" podpowiedz="Jeśli był"
+            rejestracja={register(p("rok_remontu"))} atrybuty={rok} />
+          <PoleWybor etykieta="Materiał ścian" wymagane opcje={MATERIAL_SCIAN} rejestracja={register(p("material_scian"))} />
+          <PoleWybor etykieta="Pokrycie dachu" wymagane opcje={POKRYCIE_DACHU} rejestracja={register(p("pokrycie_dachu"))} />
+          <PoleWybor etykieta="Stan techniczny" wymagane opcje={STAN_TECHNICZNY} rejestracja={register(p("stan_techniczny"))} />
+          <PoleWybor etykieta="Ogrzewanie" wymagane opcje={OGRZEWANIE} rejestracja={register(p("ogrzewanie"))} />
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <PoleTakNie etykieta="Budynek własny (nie najemca)" rejestracja={register(p("budynek_wlasny"))} />
@@ -72,9 +80,11 @@ export default function KrokLokalizacja({ indeks }: { indeks: number }) {
       <section className="karta">
         <h2 className="naglowek-sekcji">Sekcja 4A — zabezpieczenia przeciwpożarowe</h2>
         <div className="mt-5 grid gap-4 sm:grid-cols-3">
-          <Pole etykieta="Gaśnice (liczba sztuk)" rejestracja={register(p("gasnice_szt"))} />
+          <Pole etykieta="Gaśnice (liczba sztuk)" typ="number" rejestracja={register(p("gasnice_szt"))}
+            atrybuty={{ inputMode: "numeric", min: 0, max: 999, step: 1 }} />
           <Pole etykieta="Data przeglądu gaśnic" podpowiedz="dd.mm.rrrr" rejestracja={register(p("data_przegladu_gasnic"))} />
-          <Pole etykieta="Odległość od PSP (km)" rejestracja={register(p("odleglosc_psp"))} />
+          <Pole etykieta="Odległość od PSP (km)" typ="number" podpowiedz="Najbliższa jednostka straży pożarnej"
+            rejestracja={register(p("odleglosc_psp"))} atrybuty={{ inputMode: "decimal", min: 0, step: "any" }} />
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <PoleTakNie etykieta="Hydranty wewnętrzne" rejestracja={register(p("hydranty"))} />
@@ -90,7 +100,7 @@ export default function KrokLokalizacja({ indeks }: { indeks: number }) {
         <div className="mt-5 grid gap-4 sm:grid-cols-3">
           <PoleWybor etykieta="Alarm — typ" opcje={ALARM_TYP} pustaEtykieta="brak"
             rejestracja={register(p("alarm_typ"))} />
-          <Pole etykieta="Agencja ochrony (nazwa)" podpowiedz="np. Securitas, G4S"
+          <Pole etykieta="Agencja ochrony (nazwa)" podpowiedz="np. Securitas — puste, jeśli brak"
             rejestracja={register(p("agencja_ochrony"))} />
           <PoleWybor etykieta="Sejf / szafa stalowa — klasa" opcje={SEJF_KLASA} pustaEtykieta="brak"
             rejestracja={register(p("sejf_klasa"))} />
@@ -119,6 +129,8 @@ export default function KrokLokalizacja({ indeks }: { indeks: number }) {
               key={pozycja.klucz}
               etykieta={pozycja.etykieta}
               rejestracja={register(p(pozycja.klucz))}
+              tylkoOdczyt={Boolean(zWykazu[pozycja.klucz])}
+              podpowiedz={zWykazu[pozycja.klucz]}
             />
           ))}
         </div>
@@ -128,41 +140,11 @@ export default function KrokLokalizacja({ indeks }: { indeks: number }) {
           <span className="text-lg font-semibold tabular-nums text-marka-900">{zl(suma)}</span>
         </div>
 
-        {(deklarowanyMed > 0 || wykazMed > 0 || deklarowanyEei > 0 || wykazEei > 0) && (
-          <div className="mt-4 space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
-              Kontrola spójności z wykazem sprzętu
-            </p>
-            <Kontrola
-              nazwa="Sprzęt medyczny / estetyczny"
-              wykaz={wykazMed}
-              deklarowany={deklarowanyMed}
-            />
-            <Kontrola
-              nazwa="Sprzęt elektroniczny (IT, kasy)"
-              wykaz={wykazEei}
-              deklarowany={deklarowanyEei}
-            />
-          </div>
-        )}
+        <p className="mt-3 text-xs text-stone-500">
+          Sprzęt medyczny i elektronikę możesz wpisać tu jako kwotę albo dodać wykaz urządzeń w dalszych
+          krokach — wtedy suma policzy się sama.
+        </p>
       </section>
-    </div>
-  );
-}
-
-function Kontrola({ nazwa, wykaz, deklarowany }: { nazwa: string; wykaz: number; deklarowany: number }) {
-  const zgodne = wykaz === deklarowany;
-  return (
-    <div
-      className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm ${
-        zgodne ? "bg-stone-50 text-stone-600" : "bg-amber-50 text-amber-900"
-      }`}
-    >
-      <span>{nazwa}</span>
-      <span className="tabular-nums">
-        wykaz {zl(wykaz)} · deklarowane {zl(deklarowany)}
-        {!zgodne && <span className="ml-2 font-medium">różnica {zl(Math.abs(wykaz - deklarowany))}</span>}
-      </span>
     </div>
   );
 }

@@ -19,6 +19,7 @@ import { zl } from "@/lib/format";
 import KrokLokalizacja from "./KrokLokalizacja";
 import WeryfikacjaRegon from "./WeryfikacjaRegon";
 import { DOKUMENTY, TRESC_ZGODY } from "@/lib/dystrybutor";
+import { pustaPozycja, sumaWykazu } from "@/lib/porzadkowanie";
 import { TabelaSzkod, WykazElektroniki, WykazSprzetuMedycznego } from "./KrokiPomocnicze";
 
 type Props = {
@@ -98,6 +99,33 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
     }
   }, [token, metody]);
 
+  // Suma sprzętu medycznego i elektroniki w lokalizacji = suma wykazu (gdy wykaz
+  // ma wartości). Klient wypełnia sumy lokalizacji przed wykazem i zostawiał 0 —
+  // wniosek szedł z zaniżoną sumą. To samo robi serwer przy zapisie (porzadkowanie.ts).
+  useEffect(() => {
+    const uzgodnij = () => {
+      const w = metody.getValues();
+      (w.lokalizacje ?? []).forEach((lok, i) => {
+        for (const [klucz, lista] of [
+          ["suma_sprzet_medyczny", w.sprzet_medyczny ?? []],
+          ["suma_elektronika_it", w.elektronika_eei ?? []],
+        ] as const) {
+          const suma = sumaWykazu(lista, lok.nr ?? i + 1);
+          if (suma > 0 && Number(lok[klucz]) !== suma) {
+            metody.setValue(`lokalizacje.${i}.${klucz}`, suma, { shouldDirty: true });
+          }
+        }
+      });
+    };
+    uzgodnij();
+    const sub = metody.watch((_, { name }) => {
+      if (!name || name.startsWith("sprzet_medyczny") || name.startsWith("elektronika_eei") || name === "lokalizacje") {
+        uzgodnij();
+      }
+    });
+    return () => sub.unsubscribe();
+  }, [metody]);
+
   // Autozapis: 3 s po ostatniej zmianie, zeby nie zalewac serwera przy pisaniu.
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -123,6 +151,14 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
     zlozony.current = true;
     while (trwaZapis.current) await new Promise((r) => setTimeout(r, 100));
 
+    // Puste wiersze wykazów (dodane i niewypełnione) usuwamy przed złożeniem —
+    // także z formularza, żeby numery pozycji w komunikatach błędów się zgadzały.
+    for (const lista of ["sprzet_medyczny", "elektronika_eei"] as const) {
+      const pozycje = metody.getValues(lista) ?? [];
+      const pelne = pozycje.filter((u) => !pustaPozycja(u));
+      if (pelne.length !== pozycje.length) metody.setValue(lista, pelne);
+    }
+
     let wynik;
     try {
       wynik = await akcjaZlozWniosek(token, metody.getValues());
@@ -143,17 +179,21 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
         for (const [sciezka, komunikat] of Object.entries(wynik.bledyPol)) {
           metody.setError(sciezka as never, { type: "server", message: komunikat });
         }
-        // Przenosimy na krok, na ktorym jest pierwszy blad.
-        const pierwszy = Object.keys(wynik.bledyPol)[0] ?? "";
-        if (pierwszy.startsWith("lokalizacje.")) {
-          setKrok(1 + Number(pierwszy.split(".")[1] || 0));
-        } else if (pierwszy.startsWith("szkody")) {
-          setKrok(kroki.findIndex((k) => k.klucz === "szkody"));
-        } else if (pierwszy === "zakres" || pierwszy.startsWith("zgoda")) {
-          setKrok(kroki.length - 1);
-        } else {
-          setKrok(0);
-        }
+        // Przenosimy na krok, na ktorym jest pierwszy blad (w kolejnosci krokow).
+        const krokBledu = (sciezka: string) => {
+          const [glowa, nr] = sciezka.split(".");
+          const klucz =
+            glowa === "lokalizacje" ? `lok-${Number(nr) || 0}`
+            : glowa === "sprzet_medyczny" ? "medyczny"
+            : glowa === "elektronika_eei" ? "eei"
+            : glowa === "szkody" || glowa === "brak_szkod" ? "szkody"
+            : ["zakres", "miejscowosc_podpisu", "data_podpisu", "zgoda_prawdziwosc", "zgoda_rodo", "uwagi",
+               "posiada_polise", "towarzystwo_obecne", "nr_polisy_obecny", "waznosc_do", "roczna_skladka_obecna"].includes(glowa)
+              ? "podsumowanie"
+            : "firma";
+          return Math.max(0, kroki.findIndex((k) => k.klucz === klucz));
+        };
+        setKrok(Math.min(...Object.keys(wynik.bledyPol).map(krokBledu)));
       }
     }
   }
@@ -310,7 +350,8 @@ function KrokDaneFirmy({ token }: { token: string }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <Pole etykieta="Nazwa firmy / imię i nazwisko" wymagane blad={bledy.nazwa_firmy}
             rejestracja={register("nazwa_firmy")} />
-          <Pole etykieta="NIP" podpowiedz="10 cyfr" blad={bledy.nip} rejestracja={register("nip")} />
+          <Pole etykieta="NIP" wymagane podpowiedz="10 cyfr" blad={bledy.nip} rejestracja={register("nip")}
+            atrybuty={{ inputMode: "numeric", autoComplete: "off" }} />
           <WeryfikacjaRegon
             token={token}
             pobierzNip={() => getValues("nip")}
@@ -349,7 +390,7 @@ function KrokDaneFirmy({ token }: { token: string }) {
           />
           <Pole etykieta="REGON" rejestracja={register("regon")} />
           <Pole etykieta="KRS" rejestracja={register("krs")} />
-          <PoleWybor etykieta="Forma prawna" opcje={FORMA_PRAWNA} rejestracja={register("forma_prawna")} />
+          <PoleWybor etykieta="Forma prawna" wymagane opcje={FORMA_PRAWNA} rejestracja={register("forma_prawna")} />
           <Pole etykieta="Numer PKD" podpowiedz="np. 96.02.Z" rejestracja={register("numer_pkd")} />
           <div className="sm:col-span-2">
             <Pole etykieta="Adres siedziby" wymagane blad={bledy.adres_siedziby}
@@ -370,9 +411,9 @@ function KrokDaneFirmy({ token }: { token: string }) {
               podpowiedz="np. Salon kosmetyczny, klinika medycyny estetycznej"
               blad={bledy.rodzaj_dzialalnosci} rejestracja={register("rodzaj_dzialalnosci")} />
           </div>
-          <PoleWybor etykieta="Liczba pracowników" opcje={LICZBA_PRACOWNIKOW}
+          <PoleWybor etykieta="Liczba pracowników" wymagane opcje={LICZBA_PRACOWNIKOW}
             rejestracja={register("liczba_pracownikow")} />
-          <PoleWybor etykieta="Szacunkowy roczny obrót" opcje={ROCZNY_OBROT}
+          <PoleWybor etykieta="Szacunkowy roczny obrót" wymagane opcje={ROCZNY_OBROT}
             rejestracja={register("roczny_obrot")} />
         </div>
       </Sekcja>
@@ -498,8 +539,10 @@ function KrokPodsumowanie() {
           rejestracja={register("uwagi")} />
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <Pole etykieta="Miejscowość" wymagane rejestracja={register("miejscowosc_podpisu")} />
-          <Pole etykieta="Data" typ="date" rejestracja={register("data_podpisu")} />
+          <Pole etykieta="Miejscowość" wymagane podpowiedz="Sama nazwa, np. Warszawa"
+            rejestracja={register("miejscowosc_podpisu")} />
+          <Pole etykieta="Data" typ="date" podpowiedz="Puste pole = dzień złożenia wniosku"
+            rejestracja={register("data_podpisu")} />
         </div>
 
         <div className="mt-5 space-y-3">

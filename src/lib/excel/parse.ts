@@ -16,6 +16,7 @@ import {
   ZAKRES,
   ZAKRES_ALIASY,
 } from "../slowniki";
+import { rozdzielMiejscowoscIDate } from "../porzadkowanie";
 import { zbadajZgodnosc, type Zgodnosc } from "./zgodnosc";
 
 /**
@@ -436,7 +437,10 @@ export async function wczytajWniosekZExcela(plik: ArrayBuffer): Promise<WynikImp
       ? komorkaTekst(wsPodsum.getRow(nrUwag + 1).getCell(2)).trim() ||
         tp("Uwagi, opis działalności, pytania do agenta")
       : "";
-    podsumowanie.miejscowosc_podpisu = tp("Miejscowość i data");
+    // W szablonie to jedna komórka „Miejscowość i data” — rozdzielamy na dwa pola.
+    const { miejscowosc, data } = rozdzielMiejscowoscIDate(tp("Miejscowość i data"));
+    podsumowanie.miejscowosc_podpisu = miejscowosc;
+    podsumowanie.data_podpisu = data;
     podsumowanie.zgoda_prawdziwosc = Boolean(
       indeks.get(norm("Oświadczam, że wszystkie informacje podane w niniejszym wniosku są zgodne z prawdą i odzwierciedlają rzeczywisty stan faktyczny.")),
     );

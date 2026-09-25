@@ -47,6 +47,21 @@ export const POKRYCIE_DACHU = [
   "Inne",
 ] as const;
 
+/**
+ * Piętro / kondygnacja — w szablonie Excel to wolny tekst („0”, „parter”, „-1”),
+ * w formularzu lista. Import i zapis sprowadzają wpisy do tych wartości
+ * (porzadkowanie.ts), żeby agent i ubezpieczyciel dostali jednolite dane.
+ */
+export const PIETRO = [
+  "Suterena / piwnica",
+  "Parter",
+  "1. piętro",
+  "2. piętro",
+  "3. piętro",
+  "4. piętro lub wyżej",
+  "Cały budynek",
+] as const;
+
 export const STAN_TECHNICZNY = ["Bardzo dobry", "Dobry", "Dostateczny", "Wymaga remontu"] as const;
 
 export const OGRZEWANIE = [

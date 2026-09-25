@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { InputHTMLAttributes, ReactNode } from "react";
 import { get, useFormContext } from "react-hook-form";
 import type { FieldError, UseFormRegisterReturn } from "react-hook-form";
 
@@ -50,13 +50,22 @@ function Opakowanie({
   );
 }
 
-export function Pole({ etykieta, podpowiedz, wymagane, blad: jawny, rejestracja, typ = "text" }: Wspolne & { typ?: string }) {
+export function Pole({
+  etykieta,
+  podpowiedz,
+  wymagane,
+  blad: jawny,
+  rejestracja,
+  typ = "text",
+  atrybuty,
+}: Wspolne & { typ?: string; atrybuty?: InputHTMLAttributes<HTMLInputElement> }) {
   const blad = useBladPola(rejestracja.name, jawny);
   return (
     <Opakowanie id={rejestracja.name} {...{ etykieta, podpowiedz, wymagane, blad }}>
       <input
         id={rejestracja.name}
         type={typ}
+        {...atrybuty}
         className={`pole ${blad?.message ? "pole-blad" : ""}`}
         aria-invalid={Boolean(blad?.message)}
         {...rejestracja}
@@ -80,7 +89,18 @@ export function PoleObszar({ etykieta, podpowiedz, wymagane, blad: jawny, rejest
 }
 
 /** Pole kwotowe. W bazie i w Excelu kwoty sa w pelnych zlotych. */
-export function PoleKwota({ etykieta, podpowiedz, wymagane, blad: jawny, rejestracja }: Wspolne) {
+/**
+ * `tylkoOdczyt` — kwota wyliczana przez formularz (np. suma z wykazu sprzętu):
+ * widoczna i zapisywana, ale nie do ręcznej edycji.
+ */
+export function PoleKwota({
+  etykieta,
+  podpowiedz,
+  wymagane,
+  blad: jawny,
+  rejestracja,
+  tylkoOdczyt = false,
+}: Wspolne & { tylkoOdczyt?: boolean }) {
   const blad = useBladPola(rejestracja.name, jawny);
   return (
     <Opakowanie id={rejestracja.name} {...{ etykieta, podpowiedz, wymagane, blad }}>
@@ -91,7 +111,11 @@ export function PoleKwota({ etykieta, podpowiedz, wymagane, blad: jawny, rejestr
           min={0}
           step={1}
           inputMode="numeric"
-          className={`pole pr-12 text-right tabular-nums ${blad?.message ? "pole-blad" : ""}`}
+          readOnly={tylkoOdczyt}
+          aria-readonly={tylkoOdczyt || undefined}
+          className={`pole pr-12 text-right tabular-nums ${blad?.message ? "pole-blad" : ""} ${
+            tylkoOdczyt ? "cursor-default bg-marka-50 text-marka-900 focus:ring-0" : ""
+          }`}
           {...rejestracja}
         />
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-stone-400">

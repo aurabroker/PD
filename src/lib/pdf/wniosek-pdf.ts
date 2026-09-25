@@ -4,6 +4,7 @@ import { zl } from "../format";
 import { sumaLokalizacji, sumaWniosku, type WniosekRoboczy } from "../schema";
 import { POZYCJE_SUM } from "../slowniki";
 import { DYSTRYBUTOR, TRESC_ZGODY } from "../dystrybutor";
+import { jestBrak, tytulLokalizacji } from "../porzadkowanie";
 import { FONT_BOLD, FONT_REGULAR, LOGO_PDF } from "./zasoby.generated";
 
 /**
@@ -405,7 +406,7 @@ export async function generujPdfWniosku({ dane, nrReferencyjny, zlozono }: DaneP
 
   // --- Lokalizacje ---
   for (const lok of dane.lokalizacje) {
-    s.sekcja(`Lokalizacja ${lok.nr}${lok.nazwa ? ` — ${lok.nazwa}` : ""}`);
+    s.sekcja(tytulLokalizacji(lok));
     s.pola([
       ["Adres", lok.adres],
       ["Typ lokalu", lok.typ_lokalu],
@@ -434,7 +435,7 @@ export async function generujPdfWniosku({ dane, nrReferencyjny, zlozono }: DaneP
         "Zabezpieczenia antykradzieżowe",
         listaZabezpieczen([
           lok.alarm_typ && lok.alarm_typ !== "brak" && `alarm: ${lok.alarm_typ}`,
-          lok.agencja_ochrony && `ochrona: ${lok.agencja_ochrony}`,
+          lok.agencja_ochrony && !jestBrak(lok.agencja_ochrony) && `ochrona: ${lok.agencja_ochrony}`,
           lok.agencja_24h && "ochrona 24h",
           lok.cctv && "monitoring CCTV",
           lok.sejf_klasa && lok.sejf_klasa !== "brak" && `sejf kl. ${lok.sejf_klasa}`,

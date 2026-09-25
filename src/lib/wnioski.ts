@@ -2,6 +2,7 @@ import "server-only";
 import { supabaseAdmin } from "./supabase/admin";
 import { doWierszaWniosku, doWierszyLokalizacji, zWierszy } from "./mapowanie";
 import { znormalizujNumeracje } from "./schema";
+import { uporzadkujDane } from "./porzadkowanie";
 import type { WniosekRoboczy } from "./schema";
 import type { Zgodnosc } from "./excel/zgodnosc";
 import { zapiszHistorie } from "./historia";
@@ -29,7 +30,7 @@ export async function utworzWniosek(
     zgodnosc?: Zgodnosc | null;
   },
 ) {
-  const dane = znormalizujNumeracje(daneWejsciowe);
+  const dane = uporzadkujDane(znormalizujNumeracje(daneWejsciowe));
   const supabase = supabaseAdmin();
   const token = nowyToken(opcje.companyId ?? null);
   const wygasa = new Date(Date.now() + WAZNOSC_DNI * 24 * 60 * 60 * 1000).toISOString();
@@ -95,7 +96,7 @@ export async function zapiszWniosek(
   daneWejsciowe: WniosekRoboczy,
   opcje: { zloz?: boolean } = {},
 ) {
-  const dane = znormalizujNumeracje(daneWejsciowe);
+  const dane = uporzadkujDane(znormalizujNumeracje(daneWejsciowe));
   const supabase = supabaseAdmin();
 
   const { data: istniejacy, error: bladOdczytu } = await supabase

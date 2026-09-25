@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import ExcelJS from "exceljs";
 import { generujKorpus } from "./generuj-zlosliwe.mjs";
 
 const KATALOG = path.dirname(fileURLToPath(import.meta.url));
@@ -132,7 +133,7 @@ async function wypelnijLokalizacje(page, i, sumy) {
   await wpisz(page, p("nazwa"), `Oddział ${i + 1}`);
   await wpisz(page, p("adres"), `ul. Testowa ${i + 1}, 00-00${i} Warszawa`);
   await wybierz(page, p("typ_lokalu"), "Lokal usługowy");
-  await wpisz(page, p("pietro"), "0");
+  await wybierz(page, p("pietro"), "Parter");
   await wpisz(page, p("powierzchnia"), 120 + i);
   await wpisz(page, p("rok_budowy"), "2005");
   await wpisz(page, p("rok_remontu"), "2021");
@@ -465,8 +466,13 @@ await uruchom("T6 usunięcie środkowej lokalizacji z przypisanym sprzętem", as
   sprawdz(przyp === "2", "DB: sprzęt z dawnej lokalizacji 3 wskazuje teraz na 2", `lokalizacja urządzenia: ${przyp}`);
   await krok(page, "Lokalizacja 2");
   sprawdz((await pole(page, "lokalizacje.1.adres").inputValue()) === "ul. Trzecia 3", "UI: krok 'Lokalizacja 2' pokazuje dawną trzecią");
-  const kontrola = await page.locator("text=Sprzęt medyczny / estetyczny").first().locator("..").innerText().catch(() => "");
-  sprawdz(!/różnica/.test(kontrola), "UI: kontrola spójności nie zgłasza fałszywej rozbieżności", kontrola);
+  const sumaMed = pole(page, "lokalizacje.1.suma_sprzet_medyczny");
+  sprawdz((await sumaMed.inputValue()) === "50000" && (await sumaMed.getAttribute("readonly")) !== null,
+    "UI: suma sprzętu medycznego po przenumerowaniu liczona z wykazu (tylko do odczytu)", await sumaMed.inputValue());
+  await krok(page, "Sprzęt medyczny");
+  await wpisz(page, "sprzet_medyczny.0.wartosc", 70000);
+  await krok(page, "Lokalizacja 2");
+  sprawdz((await sumaMed.inputValue()) === "70000", "UI: zmiana wartości w wykazie od razu zmienia sumę lokalizacji", await sumaMed.inputValue());
 }, browser);
 
 // ---------------------------------------------------------------------------
@@ -484,9 +490,20 @@ await uruchom("T7 import Excela przez stronę i złożenie", async ({ page }) =>
   sprawdz(uw7 === "Prosimy o wycenę wariantu z ochroną cyber.", "uwagi wczytane z ramki pod etykietą (B37)", uw7);
   const zg7 = sql(`select import_zgodnosc->>'zgodny' from mienie_wnioski where form_token='${token}'`);
   sprawdz(zg7 === "true", "DB: wypełniony oryginalny szablon rozpoznany jako zgodny", zg7);
+  await krok(page, "Lokalizacja 1");
+  sprawdz((await pole(page, "lokalizacje.0.pietro").inputValue()) === "Parter", "import: piętro „0” z arkusza zamienione na „Parter”");
   await krok(page, "Podsumowanie");
+  sprawdz((await pole(page, "miejscowosc_podpisu").inputValue()) === "Warszawa", "import: „Warszawa, 22.09.2026” rozdzielone — sama miejscowość");
   await zaznacz(page, "zgoda_prawdziwosc");
   await zaznacz(page, "zgoda_rodo");
+  // W pliku lokalizacja 2 nie ma roku budowy i dachu — złożenie ma na to wskazać.
+  await page.getByRole("button", { name: "Złóż wniosek" }).click();
+  await page.getByText("Podaj rok budowy", { exact: false }).first().waitFor({ timeout: 15000 });
+  sprawdz(await pole(page, "lokalizacje.1.rok_budowy").isVisible(), "brak roku budowy w lok. 2: przeniesiono na krok „Lokalizacja 2”");
+  sprawdz(await page.getByText("Wybierz pokrycie dachu").isVisible(), "komunikat o brakującym pokryciu dachu przy polu");
+  await wpisz(page, "lokalizacje.1.rok_budowy", "2012");
+  await wybierz(page, "lokalizacje.1.pokrycie_dachu", "Strop żelbetowy (flat)");
+  await krok(page, "Podsumowanie");
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
   await page.waitForURL(/\/zlozony$/, { timeout: 20000 });
   const r = sql(`select status, suma_lacznie from mienie_wnioski where form_token='${token}'`);
@@ -997,6 +1014,84 @@ await uruchom("T23 strona główna: logo Aura Expert i sekcja „Nasze serwisy�
   sprawdz(logoMaila.status === 200 && logoMaila.headers.get("content-type") === "image/png", "logo do maili (PNG) dostępne pod stałym adresem", String(logoMaila.status));
   const ikona = await fetch(APP + "/icon.png");
   sprawdz(ikona.status === 200, "favicon z symbolem Aura Expert", String(ikona.status));
+}, browser);
+
+// ---------------------------------------------------------------------------
+await uruchom("T24 wniosek jak od klienta: bez NIP, EEI bez sumy, wykaz sprzętu, data w miejscowości", async ({ page }) => {
+  const token = await nowyWniosek(page);
+  await wypelnijDaneFirmy(page, { nip: "" });
+  await dalej(page);
+  await wpisz(page, "lokalizacje.0.adres", "ul. Kliencka 1, 15-000 Białystok");
+  await wybierz(page, "lokalizacje.0.typ_lokalu", "Lokal usługowy");
+  await wpisz(page, "lokalizacje.0.powierzchnia", 78);
+  await wpisz(page, "lokalizacje.0.suma_wyposazenie", 30000);
+  await krok(page, "Sprzęt medyczny");
+  for (const [i, [nazwa, wart]] of [["Laser diodowy", 180000], ["Kriolipoliza", 50000]].entries()) {
+    await page.getByRole("button", { name: "+ Dodaj urządzenie" }).click();
+    await wpisz(page, `sprzet_medyczny.${i}.nazwa`, nazwa);
+    await wpisz(page, `sprzet_medyczny.${i}.wartosc`, wart);
+  }
+  await page.getByRole("button", { name: "+ Dodaj urządzenie" }).click(); // pusty wiersz — ma zniknąć przy złożeniu
+  await krok(page, "Lokalizacja 1");
+  const sumaMed = pole(page, "lokalizacje.0.suma_sprzet_medyczny");
+  sprawdz((await sumaMed.inputValue()) === "230000" && (await sumaMed.getAttribute("readonly")) !== null,
+    "suma sprzętu medycznego = suma wykazu (230 000), pole tylko do odczytu", await sumaMed.inputValue());
+  sprawdz((await stanZapisu(page)) === "zapisano", "autozapis po dodaniu wykazu");
+  const lok = sql(`select l.suma_sprzet_medyczny from mienie_lokalizacje l join mienie_wnioski w on w.id=l.wniosek_id where w.form_token='${token}'`);
+  sprawdz(Number(lok) === 230000, "DB: autozapis zapisał sumę sprzętu z wykazu", lok);
+  await krok(page, "Podsumowanie");
+  for (const z of ["Mienie od ognia i zdarzeń losowych", "Sprzęt elektroniczny (EEI)", "Sprzęt medyczny / aparatura"]) {
+    await page.locator(`input[type=checkbox][value="${z}"]`).check();
+  }
+  await wpisz(page, "miejscowosc_podpisu", "Białystok 24-09-2026");
+  await zaznacz(page, "zgoda_prawdziwosc"); await zaznacz(page, "zgoda_rodo");
+  await page.getByRole("button", { name: "Złóż wniosek" }).click();
+  await page.getByText("Podaj NIP").waitFor({ timeout: 15000 });
+  sprawdz(/\/wniosek\/[^/]+$/.test(page.url()), "wniosek bez NIP nie przechodzi");
+  sprawdz(await page.getByText("Podaj NIP").isVisible(), "przeniesiono na „Dane firmy” z komunikatem „Podaj NIP”");
+  await krok(page, "Sprzęt medyczny");
+  sprawdz((await page.locator("[name$='.nazwa'][name^='sprzet_medyczny']").count()) === 2, "pusty wiersz wykazu usunięty przy złożeniu");
+  await krok(page, "Lokalizacja 1");
+  for (const t of ["Wybierz piętro z listy", "Podaj rok budowy", "Wybierz materiał ścian", "Wybierz stan techniczny"]) {
+    sprawdz(await page.getByText(t, { exact: false }).first().isVisible(), `lokalizacja: „${t}”`);
+  }
+  await krok(page, "Podsumowanie");
+  sprawdz(await page.getByText(/Zaznaczono sprzęt elektroniczny \(EEI\)/).isVisible(), "EEI w zakresie bez sumy — komunikat przy zakresie");
+  sprawdz(await page.getByText("Wpisz samą miejscowość", { exact: false }).isVisible(), "data w polu miejscowości — komunikat");
+  const s24 = sql(`select status from mienie_wnioski where form_token='${token}'`);
+  sprawdz(s24 === "roboczy", "DB: wniosek nadal roboczy", s24);
+}, browser);
+
+// ---------------------------------------------------------------------------
+await uruchom("T25 wykaz sprzętu do .xlsx dla ubezpieczyciela (panel)", async ({ page }) => {
+  const id = sql(`select id from mienie_wnioski where nazwa_firmy='Salon Testowy Ąę sp. z o.o.' and status<>'roboczy'
+                  and jsonb_array_length(sprzet_medyczny)=3 order by created_at desc limit 1`);
+  if (!id) return sprawdz(false, "T25 wymaga wniosku złożonego w T1");
+  const bezLogowania = await fetch(`${APP}/api/admin/wnioski/${id}/sprzet`);
+  sprawdz(bezLogowania.status === 401, "bez logowania: 401", String(bezLogowania.status));
+  await zaloguj(page, ADMIN.email, ADMIN.haslo);
+  await page.goto(`${APP}/admin/wnioski/${id}`);
+  const link = page.getByRole("link", { name: "Wykaz sprzętu (.xlsx)" });
+  sprawdz(await link.isVisible(), "przycisk „Wykaz sprzętu (.xlsx)” na karcie wniosku");
+  const [dl] = await Promise.all([page.waitForEvent("download"), link.click()]);
+  const sciezka = path.join(TMP, "e2e-wykaz-sprzetu.xlsx");
+  await dl.saveAs(sciezka);
+  const nr = sql(`select nr_referencyjny from mienie_wnioski where id='${id}'`);
+  sprawdz(dl.suggestedFilename() === `Wykaz-sprzetu_${nr.replace(/\//g, "-")}.xlsx`, "nazwa pliku z numerem wniosku", dl.suggestedFilename());
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(sciezka);
+  sprawdz(JSON.stringify(wb.worksheets.map((w) => w.name)) === JSON.stringify(["Sprzęt medyczny", "Elektronika EEI"]), "dwa arkusze: sprzęt medyczny i elektronika", wb.worksheets.map((w) => w.name).join(","));
+  const kwoty = (ws) => {
+    const wart = [];
+    ws.eachRow((r, n) => { if (n > 5 && typeof r.getCell(1).value === "number") wart.push(Number(r.getCell(ws.name === "Sprzęt medyczny" ? 10 : 9).value)); });
+    return wart;
+  };
+  const med = kwoty(wb.getWorksheet("Sprzęt medyczny"));
+  const eei = kwoty(wb.getWorksheet("Elektronika EEI"));
+  sprawdz(med.length === 3 && med.reduce((a, b) => a + b, 0) === 405000, "sprzęt medyczny: 3 pozycje, razem 405 000 (liczby, nie tekst)", JSON.stringify(med));
+  sprawdz(eei.length === 2 && eei.reduce((a, b) => a + b, 0) === 12500, "elektronika: 2 pozycje, razem 12 500", JSON.stringify(eei));
+  const a2 = String(wb.getWorksheet("Sprzęt medyczny").getCell("A2").value);
+  sprawdz(a2.includes(nr) && a2.includes("Salon Testowy Ąę"), "nagłówek arkusza: numer wniosku i ubezpieczający", a2);
 }, browser);
 
 await browser.close();

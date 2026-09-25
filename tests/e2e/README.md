@@ -19,7 +19,7 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 | T4 | złożenie pustego wniosku — komunikaty i przejście do pola z błędem |
 | T5 | wyścig zapisów w jednej karcie |
 | T6 | usunięcie środkowej lokalizacji — przenumerowanie i przepięcie sprzętu |
-| T7 | import Excela przez stronę i złożenie |
+| T7 | import Excela przez stronę i złożenie (piętro i miejscowość uporządkowane, brakujący rok budowy/dach blokuje złożenie do uzupełnienia) |
 | T8 | ujemna kwota, ogromna kwota, długi tekst |
 | T9 | telefon 390×844 — złożenie i brak poziomego przewijania |
 | T10 | import z wartościami spoza list i brakiem e-maila |
@@ -36,6 +36,8 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 | T21 | statystyki: liczby zgodne z bazą, wszystkie okresy |
 | T22 | baner na stronie „Dziękujemy”: gdy grafika się nie wczyta, karta tekstowa z tym samym linkiem |
 | T23 | strona główna: logo Aura Expert w nagłówku, favicon, sekcja „Nasze serwisy” (4 serwisy, Beauty Polisa „Wkrótce”) |
+| T24 | wniosek jak od klienta: bez NIP, EEI bez sumy, data w polu miejscowości — złożenie zablokowane z komunikatami; suma sprzętu z wykazu (tylko do odczytu), pusty wiersz wykazu usunięty |
+| T25 | wykaz sprzętu do .xlsx z panelu: 401 bez logowania, arkusze medyczny/EEI, kwoty jako liczby, sumy |
 
 Korpus złośliwych plików do T14 generuje `tests/e2e/generuj-zlosliwe.mjs`
 (bez zależności, sam z szablonu i wypełnionego wniosku). Można go uruchomić

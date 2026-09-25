@@ -12,6 +12,7 @@ import {
   LICZBA_PRACOWNIKOW,
   MATERIAL_SCIAN,
   OGRZEWANIE,
+  PIETRO,
   POKRYCIE_DACHU,
   ROCZNY_OBROT,
   SEJF_KLASA,
@@ -295,15 +296,80 @@ export const wniosekDoZlozeniaSchema = wniosekSchema
     zakres: z.array(z.enum(ZAKRES)).min(1, "Zaznacz co najmniej jeden zakres ubezpieczenia"),
   })
   .superRefine((dane, ctx) => {
+    const blad = (path: (string | number)[], message: string) =>
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path, message });
+    const rokTeraz = new Date().getFullYear();
+    const zlyRok = (v: string, od: number) => {
+      const t = v.trim();
+      return !/^\d{4}$/.test(t) || Number(t) < od || Number(t) > rokTeraz;
+    };
+
+    // Dane ubezpieczającego — minimum, bez którego ubezpieczyciel nie wyceni ryzyka.
+    if (!dane.nip.trim()) blad(["nip"], "Podaj NIP");
+    if (!dane.forma_prawna) blad(["forma_prawna"], "Wybierz formę prawną");
+    if (!dane.liczba_pracownikow) blad(["liczba_pracownikow"], "Wybierz liczbę pracowników");
+    if (!dane.roczny_obrot) blad(["roczny_obrot"], "Wybierz przedział obrotu");
+
     dane.lokalizacje.forEach((lok, i) => {
-      if (!lok.adres.trim()) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["lokalizacje", i, "adres"],
-          message: "Adres lokalizacji jest wymagany",
-        });
+      const p = (pole: string) => ["lokalizacje", i, pole];
+      if (!lok.adres.trim()) blad(p("adres"), "Adres lokalizacji jest wymagany");
+      if (!lok.typ_lokalu) blad(p("typ_lokalu"), "Wybierz typ lokalu");
+      if (!(PIETRO as readonly string[]).includes(lok.pietro)) blad(p("pietro"), "Wybierz piętro z listy");
+      if (!lok.powierzchnia || lok.powierzchnia <= 0) blad(p("powierzchnia"), "Podaj powierzchnię w m²");
+      if (zlyRok(lok.rok_budowy, 1800)) blad(p("rok_budowy"), `Podaj rok budowy (4 cyfry, 1800–${rokTeraz})`);
+      if (lok.rok_remontu.trim()) {
+        if (zlyRok(lok.rok_remontu, 1800)) blad(p("rok_remontu"), `Rok remontu: 4 cyfry, do ${rokTeraz}`);
+        else if (/^\d{4}$/.test(lok.rok_budowy.trim()) && Number(lok.rok_remontu) < Number(lok.rok_budowy)) {
+          blad(p("rok_remontu"), "Remont nie może być wcześniej niż budowa");
+        }
+      }
+      if (!lok.material_scian) blad(p("material_scian"), "Wybierz materiał ścian");
+      if (!lok.pokrycie_dachu) blad(p("pokrycie_dachu"), "Wybierz pokrycie dachu");
+      if (!lok.stan_techniczny) blad(p("stan_techniczny"), "Wybierz stan techniczny");
+      if (!lok.ogrzewanie) blad(p("ogrzewanie"), "Wybierz rodzaj ogrzewania");
+      if (lok.gasnice_szt.trim() && !/^\d{1,3}$/.test(lok.gasnice_szt.trim())) {
+        blad(p("gasnice_szt"), "Podaj liczbę gaśnic cyframi");
       }
     });
+
+    // Wykazy sprzętu: każda pozycja z nazwą i wartością — to idzie do ubezpieczyciela.
+    for (const [lista, nazwaListy] of [
+      [dane.sprzet_medyczny, "sprzet_medyczny"],
+      [dane.elektronika_eei, "elektronika_eei"],
+    ] as const) {
+      lista.forEach((u, i) => {
+        if (!u.nazwa.trim()) blad([nazwaListy, i, "nazwa"], "Podaj nazwę urządzenia");
+        if (!(u.wartosc > 0)) blad([nazwaListy, i, "wartosc"], "Podaj wartość urządzenia");
+        if (u.rok_zakupu.trim() && zlyRok(u.rok_zakupu, 1950)) {
+          blad([nazwaListy, i, "rok_zakupu"], `Rok zakupu: 4 cyfry, do ${rokTeraz}`);
+        }
+      });
+    }
+
+    // Zaznaczony zakres musi mieć sumę ubezpieczenia — inaczej nie ma czego wycenić.
+    const razem = (klucz: (typeof KLUCZE_SUM)[number]) =>
+      dane.lokalizacje.reduce((a, l) => a + (Number(l[klucz]) || 0), 0);
+    const ma = (z: (typeof ZAKRES)[number]) => (dane.zakres as readonly string[]).includes(z);
+    if (ma("Sprzęt elektroniczny (EEI)") && razem("suma_elektronika_it") <= 0) {
+      blad(["zakres"], "Zaznaczono sprzęt elektroniczny (EEI) — dodaj wykaz w kroku „Elektronika” albo sumę w lokalizacji");
+    }
+    if (ma("Sprzęt medyczny / aparatura") && razem("suma_sprzet_medyczny") <= 0) {
+      blad(["zakres"], "Zaznaczono sprzęt medyczny — dodaj wykaz w kroku „Sprzęt medyczny” albo sumę w lokalizacji");
+    }
+    if (ma("Szyby i inne przedmioty") && razem("suma_szyby") <= 0) {
+      blad(["zakres"], "Zaznaczono szyby — podaj sumę „Szyby i inne przedmioty” w lokalizacji");
+    }
+    if (
+      ma("Mienie od ognia i zdarzeń losowych") &&
+      razem("suma_budynek") + razem("suma_wyposazenie") + razem("suma_maszyny") + razem("suma_srodki_obrotowe") <= 0
+    ) {
+      blad(["zakres"], "Zaznaczono mienie od ognia — podaj sumę budynku, wyposażenia, maszyn albo środków obrotowych");
+    }
+
+    if (!dane.miejscowosc_podpisu.trim()) blad(["miejscowosc_podpisu"], "Podaj miejscowość");
+    else if (/\d/.test(dane.miejscowosc_podpisu)) {
+      blad(["miejscowosc_podpisu"], "Wpisz samą miejscowość — datę uzupełniamy automatycznie");
+    }
 
     if (sumaWniosku(dane) <= 0) {
       ctx.addIssue({

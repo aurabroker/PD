@@ -9,7 +9,8 @@ import { weryfikujRegon, type WynikRegon } from "@/lib/regon";
 import { sprawdzPlikXlsx, BladPliku } from "@/lib/excel/bezpieczenstwo";
 import { wczytajWniosekZExcela } from "@/lib/excel/parse";
 import type { OstrzezenieImportu } from "@/lib/excel/parse";
-import { pustyWniosek, wniosekDoZlozeniaSchema, wniosekRoboczySchema } from "@/lib/schema";
+import { pustyWniosek, wniosekDoZlozeniaSchema, wniosekRoboczySchema, znormalizujNumeracje } from "@/lib/schema";
+import { uporzadkujDane } from "@/lib/porzadkowanie";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 import { utworzWniosek, zapiszWniosek } from "@/lib/wnioski";
@@ -40,12 +41,19 @@ async function ipKlienta(): Promise<string | null> {
   return h.get("cf-connecting-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 }
 
+/** Dzisiejsza data (RRRR-MM-DD) w strefie polskiej — data podpisu, gdy klient jej nie podał. */
+function dzisWarszawa(): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Warsaw" }).format(new Date());
+}
+
 /** Bledy walidacji zod -> mapa "sciezka pola" => komunikat, czytana przez formularz. */
 function bledyPol(issues: { path: (string | number)[]; message: string }[]) {
   const mapa: Record<string, string> = {};
   for (const issue of issues) {
     const klucz = issue.path.join(".");
+    // Kilka komunikatów na jednym polu (np. zakres bez sum) — pokazujemy wszystkie.
     if (!mapa[klucz]) mapa[klucz] = issue.message;
+    else if (!mapa[klucz].includes(issue.message)) mapa[klucz] += ` · ${issue.message}`;
   }
   return mapa;
 }
@@ -108,7 +116,11 @@ export async function akcjaZapiszRoboczy(token: string, dane: unknown): Promise<
 
 /** Zlozenie wniosku. Walidacja ostra - tu wymagane sa zgody, zakres i sumy. */
 export async function akcjaZlozWniosek(token: string, dane: unknown): Promise<WynikAkcji> {
-  const wynik = wniosekDoZlozeniaSchema.safeParse(dane);
+  // Te same porządki co przy zapisie (piętro ze słownika, sumy z wykazu sprzętu,
+  // puste wiersze wykazów) — walidujemy to, co faktycznie trafi do bazy.
+  const robocze = uporzadkujDane(znormalizujNumeracje(wniosekRoboczySchema.parse(dane ?? {})));
+  if (!robocze.data_podpisu) robocze.data_podpisu = dzisWarszawa();
+  const wynik = wniosekDoZlozeniaSchema.safeParse(robocze);
 
   if (!wynik.success) {
     return {

@@ -59,13 +59,14 @@ export function WykazSprzetuMedycznego({ liczbaLokalizacji }: { liczbaLokalizacj
                   ))}
                 </select>
               </div>
-              <Pole etykieta="Nazwa urządzenia" rejestracja={register(`sprzet_medyczny.${i}.nazwa`)}
+              <Pole etykieta="Nazwa urządzenia" wymagane rejestracja={register(`sprzet_medyczny.${i}.nazwa`)}
                 blad={formState.errors.sprzet_medyczny?.[i]?.nazwa} />
               <Pole etykieta="Producent" rejestracja={register(`sprzet_medyczny.${i}.producent`)} />
               <Pole etykieta="Model" rejestracja={register(`sprzet_medyczny.${i}.model`)} />
               <Pole etykieta="Nr seryjny" rejestracja={register(`sprzet_medyczny.${i}.nr_seryjny`)} />
-              <Pole etykieta="Rok zakupu" rejestracja={register(`sprzet_medyczny.${i}.rok_zakupu`)} />
-              <PoleKwota etykieta="Wartość odtworzeniowa" rejestracja={register(`sprzet_medyczny.${i}.wartosc`)} />
+              <Pole etykieta="Rok zakupu" typ="number" rejestracja={register(`sprzet_medyczny.${i}.rok_zakupu`)}
+                atrybuty={{ inputMode: "numeric", min: 1950, max: new Date().getFullYear(), placeholder: "np. 2023" }} />
+              <PoleKwota etykieta="Wartość odtworzeniowa" wymagane rejestracja={register(`sprzet_medyczny.${i}.wartosc`)} />
               <div className="sm:col-span-2 lg:col-span-2">
                 <Pole etykieta="Uwagi" rejestracja={register(`sprzet_medyczny.${i}.uwagi`)} />
               </div>
@@ -121,11 +122,12 @@ export function WykazElektroniki({ liczbaLokalizacji }: { liczbaLokalizacji: num
                   ))}
                 </select>
               </div>
-              <Pole etykieta="Nazwa urządzenia" rejestracja={register(`elektronika_eei.${i}.nazwa`)} />
+              <Pole etykieta="Nazwa urządzenia" wymagane rejestracja={register(`elektronika_eei.${i}.nazwa`)} />
               <Pole etykieta="Producent" rejestracja={register(`elektronika_eei.${i}.producent`)} />
               <Pole etykieta="Model" rejestracja={register(`elektronika_eei.${i}.model`)} />
-              <Pole etykieta="Rok zakupu" rejestracja={register(`elektronika_eei.${i}.rok_zakupu`)} />
-              <PoleKwota etykieta="Wartość odtworzeniowa" rejestracja={register(`elektronika_eei.${i}.wartosc`)} />
+              <Pole etykieta="Rok zakupu" typ="number" rejestracja={register(`elektronika_eei.${i}.rok_zakupu`)}
+                atrybuty={{ inputMode: "numeric", min: 1950, max: new Date().getFullYear(), placeholder: "np. 2023" }} />
+              <PoleKwota etykieta="Wartość odtworzeniowa" wymagane rejestracja={register(`elektronika_eei.${i}.wartosc`)} />
               <Pole etykieta="Nr seryjny" rejestracja={register(`elektronika_eei.${i}.nr_seryjny`)} />
               <div className="sm:col-span-2">
                 <Pole etykieta="Uwagi" rejestracja={register(`elektronika_eei.${i}.uwagi`)} />
