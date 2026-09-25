@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { wymaganyAdmin } from "@/lib/autoryzacja";
 import { mailZaproszenieAgenta } from "@/lib/email/zaproszenie-agenta";
+import { adresLogo } from "@/lib/email/marka";
 import { wyslijEmail } from "@/lib/email/wyslij";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -39,7 +40,12 @@ async function linkDoHasla(email: string): Promise<{ ok: true; userId: string; l
 }
 
 async function wyslijZaproszenie(o: { email: string; imie: string; link: string; zaprasza: string }) {
-  const mail = mailZaproszenieAgenta({ imieNazwisko: o.imie, link: o.link, zaprasza: o.zaprasza });
+  const mail = mailZaproszenieAgenta({
+    imieNazwisko: o.imie,
+    link: o.link,
+    zaprasza: o.zaprasza,
+    logo: adresLogo(await adresAplikacji()),
+  });
   return wyslijEmail({ do: o.email, ...mail, typ: "zaproszenie_agenta" });
 }
 

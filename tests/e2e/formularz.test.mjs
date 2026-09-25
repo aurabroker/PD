@@ -320,6 +320,9 @@ await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie
     sprawdz(/Łączna suma ubezpieczenia\s+1\s?067\s?000 zł\s+178\s?500 zł\s+1\s?245\s?500 zł/.test(tekstPdf.replace(/\u00a0/g, " ")), "PDF: tabela sum (lokalizacje i razem)");
     sprawdz(tekstPdf.includes("zażółć gęślą jaźń ?"), "PDF: emoji spoza fontu zamienione na „?”, reszta tekstu cała");
     sprawdz(/Aura Expert sp\. z o\.o\..*KNF 11229690\/A/.test(tekstPdf) && /Strona 1 z \d/.test(tekstPdf), "PDF: stopka dystrybutora i numeracja stron");
+    let obrazyPdf = "";
+    try { obrazyPdf = execSync(`pdfimages -list ${JSON.stringify(sciezkaPdf)}`, { encoding: "utf-8" }); } catch { /* brak poppler-utils */ }
+    if (obrazyPdf) sprawdz(/^\s*1\s+\d+\s+image/m.test(obrazyPdf), "PDF: logo Aura Expert osadzone na 1. stronie", obrazyPdf.split("\n").slice(2, 4).join(" | "));
   } else {
     console.log("  (pdftotext niedostępny — pomijam sprawdzenie treści PDF)");
   }
@@ -990,6 +993,8 @@ await uruchom("T23 strona główna: logo Aura Expert i sekcja „Nasze serwisy�
   sprawdz((await linki.evaluateAll((a) => a.every((x) => x.target === "_blank" && /noopener/.test(x.rel)))), "serwisy otwierają się w nowej karcie (noopener)");
   const beauty = page.locator("#serwisy li", { hasText: "Beauty Polisa" });
   sprawdz((await beauty.locator("a").count()) === 0 && (await beauty.getByText("Wkrótce").isVisible()), "Beauty Polisa: „Wkrótce”, bez linku");
+  const logoMaila = await fetch(APP + "/marka/aura-expert-email.png");
+  sprawdz(logoMaila.status === 200 && logoMaila.headers.get("content-type") === "image/png", "logo do maili (PNG) dostępne pod stałym adresem", String(logoMaila.status));
   const ikona = await fetch(APP + "/icon.png");
   sprawdz(ikona.status === 200, "favicon z symbolem Aura Expert", String(ikona.status));
 }, browser);

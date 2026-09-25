@@ -3,6 +3,7 @@ import { DOKUMENTY } from "./dystrybutor";
 import { mailNowyWniosekAgent } from "./email/nowy-wniosek-agent";
 import { mailPotwierdzenieKlienta } from "./email/potwierdzenie-klienta";
 import { losujBaner, PROMO } from "./email/promo";
+import { adresLogo } from "./email/marka";
 import { wyslijEmail, type Zalacznik } from "./email/wyslij";
 import { numerDoPliku } from "./numeracja";
 import { base64NaBajty, generujPdfWniosku } from "./pdf/wniosek-pdf";
@@ -56,6 +57,7 @@ export async function powiadomOZlozeniu(wniosekId: string, adresAplikacji: strin
         zlozono,
         zalaczniki: zalaczniki.map((z) => z.nazwa),
         promo: PROMO.wMailu ? losujBaner("email") : null,
+        logo: adresLogo(adresAplikacji),
       });
       await wyslijEmail({
         do: dane.email_kontaktowy,
@@ -80,6 +82,7 @@ export async function powiadomOZlozeniu(wniosekId: string, adresAplikacji: strin
         sumaLaczna: sumaWniosku(dane),
         zrodlo: meta.zrodlo,
         link: `${adresAplikacji}/admin/wnioski/${meta.id}`,
+        logo: adresLogo(adresAplikacji),
       });
       await wyslijEmail({
         do: zespol,

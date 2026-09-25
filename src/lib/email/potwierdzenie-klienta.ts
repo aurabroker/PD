@@ -1,5 +1,6 @@
 import { zl } from "../format";
 import { DYSTRYBUTOR } from "../dystrybutor";
+import { FONT, KOLOR, naglowekMaila } from "./marka";
 import type { Baner } from "./promo";
 
 /**
@@ -21,22 +22,14 @@ export type DanePotwierdzenia = {
   zlozono: Date;
   /** Nazwy plików w załączniku: kopia wniosku (PDF), informacja o dystrybutorze, nota RODO. */
   zalaczniki: string[];
+  /** Pełny adres logo (adresLogo() z email/marka). */
+  logo: string;
   /** Opcjonalny baner — patrz email/promo.ts. */
   promo?: Baner | null;
 };
 
 export type Wiadomosc = { temat: string; html: string; tekst: string };
 
-const KOLOR = {
-  marka: "#8a4838",
-  markaJasna: "#fdf5f3",
-  markaRamka: "#f7d5cd",
-  tekst: "#1c1917",
-  szary: "#57534e",
-  szaryJasny: "#a8a29e",
-  linia: "#e7e5e4",
-  tlo: "#f5f5f4",
-};
 
 /** Ucieczka HTML — dane klienta nigdy nie trafiają do maila jako znaczniki. */
 export const h = (v: unknown) =>
@@ -50,7 +43,6 @@ export const h = (v: unknown) =>
 const data = (d: Date) =>
   d.toLocaleDateString("pl-PL", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Warsaw" });
 
-const FONT = `font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;`;
 
 function wiersz(etykieta: string, wartoscHtml: string): string {
   return `<tr>
@@ -118,10 +110,7 @@ export function mailPotwierdzenieKlienta(d: DanePotwierdzenia): Wiadomosc {
 <tr><td align="center" style="padding:24px 12px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid ${KOLOR.linia};">
 
-    <tr><td style="background:${KOLOR.marka};padding:20px 28px;">
-      <div style="${FONT}font-size:18px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">Aura Expert</div>
-      <div style="${FONT}font-size:12px;color:${KOLOR.markaRamka};margin-top:2px;">Ubezpieczenie majątkowe salonów beauty</div>
-    </td></tr>
+    ${naglowekMaila({ logo: d.logo, podpis: "Ubezpieczenie majątkowe salonów beauty" }, h)}
 
     <tr><td style="padding:28px 28px 8px;">
       <div style="${FONT}font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:${KOLOR.marka};">Wniosek przyjęty</div>

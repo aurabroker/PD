@@ -1,5 +1,6 @@
 import { zl } from "../format";
 import { h, type Wiadomosc } from "./potwierdzenie-klienta";
+import { FONT, KOLOR, naglowekMaila } from "./marka";
 
 /** Powiadomienie zespołu o nowym złożonym wniosku (kopia PDF w załączniku). */
 export function mailNowyWniosekAgent(d: {
@@ -13,10 +14,10 @@ export function mailNowyWniosekAgent(d: {
   sumaLaczna: number;
   zrodlo: string;
   link: string;
+  logo: string;
 }): Wiadomosc {
   const zrodlo = { web: "formularz online", excel: "import pliku Excel", agent: "wniosek założony przez agenta" }[d.zrodlo] ?? d.zrodlo;
   const temat = `Nowy wniosek ${d.nrReferencyjny} — ${d.nazwaFirmy}`;
-  const FONT = `font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;`;
   const wiersz = (etykieta: string, wartosc: string) => `<tr>
       <td style="${FONT}padding:5px 0;font-size:13px;color:#57534e;vertical-align:top;width:38%;">${etykieta}</td>
       <td style="${FONT}padding:5px 0;font-size:14px;color:#1c1917;vertical-align:top;">${wartosc}</td>
@@ -27,12 +28,9 @@ export function mailNowyWniosekAgent(d: {
 <body style="margin:0;padding:0;background:#f5f5f4;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f4;"><tr><td align="center" style="padding:24px 12px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;border:1px solid #e7e5e4;overflow:hidden;">
-    <tr><td style="background:#8a4838;padding:18px 28px;">
-      <div style="${FONT}font-size:18px;font-weight:700;color:#ffffff;">Nowy wniosek</div>
-      <div style="${FONT}font-size:12px;color:#f7d5cd;margin-top:2px;">Panel wniosków majątkowych Aura Expert</div>
-    </td></tr>
+    ${naglowekMaila({ logo: d.logo, podpis: "Nowy wniosek · panel wniosków majątkowych" }, h)}
     <tr><td style="padding:24px 28px 8px;">
-      <div style="${FONT}font-size:20px;font-weight:700;color:#8a4838;">${h(d.nrReferencyjny)}</div>
+      <div style="${FONT}font-size:20px;font-weight:700;color:${KOLOR.marka};">${h(d.nrReferencyjny)}</div>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">
         ${wiersz("Ubezpieczający", `<strong>${h(d.nazwaFirmy)}</strong>`)}
         ${d.nip ? wiersz("NIP", h(d.nip)) : ""}
@@ -44,7 +42,7 @@ export function mailNowyWniosekAgent(d: {
       </table>
     </td></tr>
     <tr><td style="padding:16px 28px 28px;">
-      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background:#8a4838;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background:${KOLOR.marka};">
         <a href="${h(d.link)}" style="${FONT}display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Otwórz w panelu</a>
       </td></tr></table>
       <p style="${FONT}margin:16px 0 0;font-size:13px;line-height:19px;color:#57534e;">

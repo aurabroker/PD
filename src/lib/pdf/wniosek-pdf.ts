@@ -4,7 +4,7 @@ import { zl } from "../format";
 import { sumaLokalizacji, sumaWniosku, type WniosekRoboczy } from "../schema";
 import { POZYCJE_SUM } from "../slowniki";
 import { DYSTRYBUTOR, TRESC_ZGODY } from "../dystrybutor";
-import { FONT_BOLD, FONT_REGULAR } from "./zasoby.generated";
+import { FONT_BOLD, FONT_REGULAR, LOGO_PDF } from "./zasoby.generated";
 
 /**
  * Kopia złożonego wniosku w PDF — załącznik maila do klienta i do agentów.
@@ -31,9 +31,11 @@ const DOL = 64; // miejsce na stopkę
 const TRESC = SZER - 2 * MARGINES;
 
 const KOLOR = {
-  marka: rgb(0x8a / 255, 0x48 / 255, 0x38 / 255),
-  markaJasna: rgb(0xfd / 255, 0xf5 / 255, 0xf3 / 255),
-  markaRamka: rgb(0xf7 / 255, 0xd5 / 255, 0xcd / 255),
+  // Kolory z logo Aura Expert (jak w aplikacji i mailach).
+  marka: rgb(0x00 / 255, 0x76 / 255, 0x9f / 255),
+  akcent: rgb(0x00 / 255, 0xa4 / 255, 0xdc / 255),
+  markaJasna: rgb(0xee / 255, 0xf9 / 255, 0xfd / 255),
+  markaRamka: rgb(0xb0 / 255, 0xe3 / 255, 0xf5 / 255),
   tekst: rgb(0x1c / 255, 0x19 / 255, 0x17 / 255),
   szary: rgb(0x57 / 255, 0x53 / 255, 0x4e / 255),
   szaryJasny: rgb(0xa8 / 255, 0xa2 / 255, 0x9e / 255),
@@ -322,18 +324,28 @@ export async function generujPdfWniosku({ dane, nrReferencyjny, zlozono }: DaneP
   const s = new Sklad(doc, zwykly, gruby, nrReferencyjny);
   s.nowaStrona();
 
-  // --- Nagłówek ---
-  const WYS_PASKA = 58;
-  s.strona.drawRectangle({ x: 0, y: WYS - WYS_PASKA, width: SZER, height: WYS_PASKA, color: KOLOR.marka });
-  s.strona.drawText("Aura Expert", { x: MARGINES, y: WYS - 30, size: 16, font: gruby, color: KOLOR.bialy });
-  s.strona.drawText(oczysc("Ubezpieczenie majątkowe salonów beauty"), {
-    x: MARGINES,
-    y: WYS - 45,
+  // --- Nagłówek: logo, podpis po prawej, niebieska linia ---
+  const logo = await doc.embedPng(base64NaBajty(LOGO_PDF));
+  const WYS_LOGO = 44;
+  const logoWymiary = logo.scale(WYS_LOGO / logo.height);
+  const gora = WYS - 36;
+  s.strona.drawImage(logo, { x: MARGINES, y: gora - WYS_LOGO, width: logoWymiary.width, height: WYS_LOGO });
+  const podpis = oczysc("Ubezpieczenie majątkowe salonów beauty");
+  s.strona.drawText(podpis, {
+    x: SZER - MARGINES - zwykly.widthOfTextAtSize(podpis, 9),
+    y: gora - WYS_LOGO / 2 - 3,
     size: 9,
     font: zwykly,
-    color: KOLOR.markaRamka,
+    color: KOLOR.szary,
   });
-  s.y = WYS - WYS_PASKA - 26;
+  const liniaY = gora - WYS_LOGO - 10;
+  s.strona.drawLine({
+    start: { x: MARGINES, y: liniaY },
+    end: { x: SZER - MARGINES, y: liniaY },
+    thickness: 2,
+    color: KOLOR.akcent,
+  });
+  s.y = liniaY - 24;
   s.tekst("Wniosek o ubezpieczenie majątkowe", MARGINES, TRESC, { font: gruby, rozmiar: 17 });
   s.odstep(6);
 

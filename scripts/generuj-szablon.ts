@@ -33,12 +33,13 @@ console.log(`Wygenerowano ${path.relative(process.cwd(), cel)} — ${plik.length
 // --- Zasoby PDF: fonty i dokumenty prawne ---
 //
 // Kopia wniosku w PDF potrzebuje fontu z polskimi znakami (przycięta Liberation
-// Sans, licencja SIL OFL — assets/fonty/), a mail do klienta dołącza informację
+// Sans, licencja SIL OFL — assets/fonty/) i logo Aura Expert (assets/marka/), a mail do klienta dołącza informację
 // o dystrybutorze i notę RODO (public/dokumenty/ — te same pliki są publiczne).
 
 const zasoby = {
   FONT_REGULAR: "assets/fonty/LiberationSans-Regular.subset.ttf",
   FONT_BOLD: "assets/fonty/LiberationSans-Bold.subset.ttf",
+  LOGO_PDF: "assets/marka/aura-expert-pdf.png",
   DOKUMENT_DYSTRYBUTOR: "public/dokumenty/aura-expert-informacja-o-dystrybutorze.pdf",
   DOKUMENT_RODO: "public/dokumenty/aura-expert-nota-rodo.pdf",
 };
