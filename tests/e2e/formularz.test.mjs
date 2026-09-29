@@ -48,7 +48,22 @@ async function nowaStrona(browser, opcje = {}) {
   await ctx.route(/^https:\/\/auraexpert\.pl\/images\//, (r) => r.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }));
   const page = await ctx.newPage();
   const bledy = [];
-  page.on("pageerror", (e) => bledy.push(`pageerror na ${page.url().replace(APP, "")}: ${e.message}`));
+  // Ostatni HTML dokumentu z serwera — przy błędzie hydratacji (React #418/#423/#425)
+  // zapisujemy go razem z DOM-em przeglądarki i zrzutem, żeby dało się porównać różnicę.
+  let htmlSerwera = "";
+  page.on("response", async (r) => {
+    if (r.request().resourceType() === "document") htmlSerwera = await r.text().catch(() => "");
+  });
+  page.on("pageerror", async (e) => {
+    bledy.push(`pageerror na ${page.url().replace(APP, "")}: ${e.message}`);
+    if (/Minified React error #(418|423|425)/.test(e.message)) {
+      const baza = path.join(TMP, `e2e-hydratacja-${biezacy.split(" ")[0]}-${Date.now()}`);
+      writeFileSync(`${baza}-serwer.html`, htmlSerwera);
+      writeFileSync(`${baza}-przegladarka.html`, await page.content().catch(() => ""));
+      await page.screenshot({ path: `${baza}.png`, fullPage: true }).catch(() => {});
+      bledy.push(`  diagnostyka hydratacji: ${baza}-{serwer,przegladarka}.html`);
+    }
+  });
   page.on("console", (m) => { if (m.type() === "error") bledy.push(`console.error: ${m.text()}`); });
   page.on("response", (r) => {
     if (r.status() >= 500) bledy.push(`HTTP ${r.status()} ${r.request().method()} ${r.url()}`);
