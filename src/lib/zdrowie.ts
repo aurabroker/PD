@@ -146,24 +146,80 @@ async function wykonaj(): Promise<Raport> {
         return { stan: "blad", opis: `Brak ${!klucz ? "RESEND_API_KEY" : "RESEND_SENDER"} — maile nie wychodzą.` };
       }
       const domena = nadawca.match(/@([^>\s]+)/)?.[1]?.toLowerCase() ?? "";
-      const odp = await fetch("https://api.resend.com/domains", { headers: { Authorization: `Bearer ${klucz}` } });
-      const tresc = (await odp.json().catch(() => ({}))) as {
-        data?: { name: string; status: string }[];
+
+      // Twardy dowód, że poczta działa: udane wysyłki z ostatnich 7 dni w dzienniku.
+      // Gdy API domen Resend nie da jednoznacznej odpowiedzi (limit zapytań,
+      // paginacja, inny status niż „verified”), a maile realnie wychodzą —
+      // to „uwaga”, nie czerwony alarm.
+      const { count: udane } = await baza
+        .from("mienie_emaile")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "wyslany")
+        .not("resend_id", "is", null)
+        .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+      const wysylkaDziala = (udane ?? 0) > 0;
+      const zastrzezenie = (powod: string) =>
+        wysylkaDziala
+          ? { stan: "uwaga" as const, opis: `${powod} Maile wychodzą (${udane} udanych wysyłek w 7 dni).` }
+          : { stan: "blad" as const, opis: powod };
+
+      type OdpowiedzDomen = {
+        data?: { id: string; name: string; status: string }[];
+        has_more?: boolean;
         message?: string;
         name?: string;
       };
-      if (odp.status === 401 && /restricted/i.test(`${tresc.name} ${tresc.message}`)) {
-        return {
-          stan: "uwaga",
-          opis: `Klucz ma uprawnienie tylko do wysyłki — nie da się sprawdzić domeny ${domena}. Wysyłki kontroluje sprawdzenie „Wysłane e-maile”.`,
-        };
+      const pobierz = async (url: string) => {
+        for (let proba = 0; proba < 2; proba++) {
+          const odp = await fetch(url, {
+            headers: { Authorization: `Bearer ${klucz}`, "User-Agent": "aura-expert-wnioski/health" },
+            signal: AbortSignal.timeout(4000),
+          });
+          if (odp.status === 429 && proba === 0) {
+            await new Promise((r) => setTimeout(r, 1200)); // Resend: 2 zapytania/s
+            continue;
+          }
+          return { odp, tresc: (await odp.json().catch(() => ({}))) as OdpowiedzDomen };
+        }
+        throw new Error("Resend: limit zapytań");
+      };
+
+      // Lista domen bywa stronicowana — przechodzimy po wszystkich stronach.
+      const domeny: { id: string; name: string; status: string }[] = [];
+      let url = "https://api.resend.com/domains?limit=100";
+      for (let strona = 0; strona < 10; strona++) {
+        let wynik;
+        try {
+          wynik = await pobierz(url);
+        } catch (e) {
+          return zastrzezenie(`Nie udało się odpytać Resend (${e instanceof Error ? e.message : String(e)}).`);
+        }
+        const { odp, tresc } = wynik;
+        if (odp.status === 401 && /restricted/i.test(`${tresc.name} ${tresc.message}`)) {
+          return {
+            stan: "uwaga",
+            opis: `Klucz ma uprawnienie tylko do wysyłki — nie da się sprawdzić domeny ${domena}. ${
+              wysylkaDziala ? `Maile wychodzą (${udane} udanych wysyłek w 7 dni).` : "Wysyłki kontroluje sprawdzenie „Wysłane e-maile”."
+            }`,
+          };
+        }
+        if (!odp.ok) {
+          return zastrzezenie(`Resend odpowiada HTTP ${odp.status}${tresc.name ? ` (${tresc.name})` : ""}: ${tresc.message ?? "brak opisu"}.`);
+        }
+        domeny.push(...(tresc.data ?? []));
+        const ostatnia = tresc.data?.at(-1);
+        if (!tresc.has_more || !ostatnia) break;
+        url = `https://api.resend.com/domains?limit=100&after=${encodeURIComponent(ostatnia.id)}`;
       }
-      if (!odp.ok) return { stan: "blad", opis: `Resend odrzuca klucz: HTTP ${odp.status} ${tresc.message ?? ""}`.trim() };
-      const d = tresc.data?.find((x) => x.name.toLowerCase() === domena);
-      if (!d) return { stan: "blad", opis: `Domeny ${domena} nie ma w Resend — maile z ${nadawca} nie wyjdą.` };
+
+      const d = domeny.find((x) => x.name.toLowerCase() === domena);
+      if (!d) {
+        const znane = domeny.map((x) => x.name).slice(0, 8).join(", ") || "brak";
+        return zastrzezenie(`Domeny ${domena} nie ma na liście w Resend (widoczne: ${znane}).`);
+      }
       return d.status === "verified"
         ? { stan: "ok", opis: `Domena ${domena} zweryfikowana, nadawca: ${nadawca}.` }
-        : { stan: "blad", opis: `Domena ${domena} ma status „${d.status}” — dokończ weryfikację DNS w Resend.` };
+        : zastrzezenie(`Domena ${domena} ma w Resend status „${d.status}” (oczekiwany „verified”) — sprawdź rekordy DNS.`);
     }),
 
     sprawdz("maile", "Integracje", "Wysłane e-maile (ostatnie 24 h)", async () => {
