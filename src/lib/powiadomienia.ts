@@ -11,6 +11,7 @@ import { DOKUMENT_DYSTRYBUTOR, DOKUMENT_RODO } from "./pdf/zasoby.generated";
 import { sumaLokalizacji, sumaWniosku } from "./schema";
 import { pobierzAgentow } from "./statystyki";
 import { pobierzWniosekPoId } from "./wnioski";
+import { pobierzPodpis } from "./podpis";
 
 /**
  * Maile po złożeniu wniosku:
@@ -36,7 +37,13 @@ export async function powiadomOZlozeniu(wniosekId: string, adresAplikacji: strin
     const nr: string = meta.nr_referencyjny;
     const zlozono = meta.wyslano_at ? new Date(meta.wyslano_at) : new Date();
 
-    const pdf = await generujPdfWniosku({ dane, nrReferencyjny: nr, zlozono });
+    const p = await pobierzPodpis(meta.id);
+    const pdf = await generujPdfWniosku({
+      dane,
+      nrReferencyjny: nr,
+      zlozono,
+      podpis: p ? { png: p.png, podpisanoAt: new Date(p.podpisano_at), skrotTresci: p.skrot_tresci } : null,
+    });
     const kopia: Zalacznik = { nazwa: nazwaPdfWniosku(nr), tresc: pdf };
     const replyTo = process.env.RESEND_REPLY_TO || undefined;
 

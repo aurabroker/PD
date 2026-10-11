@@ -98,7 +98,7 @@ async function wykonaj(): Promise<Raport> {
         .select("import_zgodnosc, przypisany_agent, status_zmieniony_at, polisa_skladka")
         .limit(1);
       if (kolumny.error) braki.push(`kolumny wniosków (${kolumny.error.message})`);
-      for (const t of ["mienie_agenci", "mienie_historia", "mienie_emaile"]) {
+      for (const t of ["mienie_agenci", "mienie_historia", "mienie_emaile", "mienie_podpisy"]) {
         const { error } = await baza.from(t).select("*", { head: true, count: "exact" });
         if (error) braki.push(`tabela ${t}`);
       }

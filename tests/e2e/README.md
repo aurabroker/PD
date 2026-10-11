@@ -13,7 +13,7 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 
 | | Co sprawdza |
 |---|---|
-| T1 | pełna ścieżka: 2 lokalizacje, sprzęt, szkody, polisa, odświeżenie w trakcie, złożenie, maile po złożeniu (klient + zespół), kopia PDF (treść, polskie znaki, stopka), pobranie .xlsx |
+| T1 | pełna ścieżka: 2 lokalizacje, sprzęt, szkody, polisa, odświeżenie w trakcie, podpis myszą, złożenie (podpis w bazie i w PDF ze skrótem SHA-256), maile po złożeniu (klient + zespół), kopia PDF (treść, polskie znaki, stopka), pobranie .xlsx |
 | T2 | autozapis wniosku z samą nazwą firmy; PDF wersji roboczej niedostępny |
 | T3 | błędny NIP nie blokuje zapisu reszty danych |
 | T4 | złożenie pustego wniosku — komunikaty i przejście do pola z błędem |
@@ -21,7 +21,7 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 | T6 | usunięcie środkowej lokalizacji — przenumerowanie i przepięcie sprzętu |
 | T7 | import Excela przez stronę i złożenie (piętro i miejscowość uporządkowane, brakujący rok budowy/dach blokuje złożenie do uzupełnienia) |
 | T8 | ujemna kwota, ogromna kwota, długi tekst |
-| T9 | telefon 390×844 — złożenie i brak poziomego przewijania |
+| T9 | telefon 390×844 — podpis w oknie na cały ekran, złożenie i brak poziomego przewijania |
 | T10 | import z wartościami spoza list i brakiem e-maila |
 | T11 | ten sam wniosek w dwóch kartach naraz |
 | T12 | data wpisana ręcznie jak w Safari (`23.09.2026`, `jutro`) |
@@ -57,6 +57,7 @@ createdb -h 127.0.0.1 -p 54322 -U postgres beauty
 psql -h 127.0.0.1 -p 54322 -U postgres -d beauty -f tests/e2e/replika-schemat.sql
 # migracje nowsze niż replika-schemat.sql — te same pliki, co na produkcji
 psql -h 127.0.0.1 -p 54322 -U postgres -d beauty -f supabase/migrations/20260924_mienie_panel_agentow.sql
+psql -h 127.0.0.1 -p 54322 -U postgres -d beauty -f supabase/migrations/20261011_mienie_podpisy.sql
 
 # 2. PostgREST i proxy udające adres Supabase (REST + atrapa logowania GoTrue:
 #    hasło, sesja, zaproszenie z jednorazowym linkiem — panel agenta w T17–T21)

@@ -3,6 +3,7 @@ import { supabaseAdmin } from "./supabase/admin";
 import { doWierszaWniosku, doWierszyLokalizacji, zWierszy } from "./mapowanie";
 import { znormalizujNumeracje } from "./schema";
 import { uporzadkujDane } from "./porzadkowanie";
+import { kanonicznaTresc, sha256, zapiszPodpis, type PodpisSprawdzony } from "./podpis";
 import type { WniosekRoboczy } from "./schema";
 import type { Zgodnosc } from "./excel/zgodnosc";
 import { zapiszHistorie } from "./historia";
@@ -94,7 +95,11 @@ async function zapiszLokalizacje(
 export async function zapiszWniosek(
   token: string,
   daneWejsciowe: WniosekRoboczy,
-  opcje: { zloz?: boolean } = {},
+  opcje: {
+    zloz?: boolean;
+    /** Podpis wnioskodawcy — wymagany przy złożeniu z formularza (akcjaZlozWniosek). */
+    podpis?: { podpis: PodpisSprawdzony; ip: string | null; userAgent: string | null };
+  } = {},
 ) {
   const dane = uporzadkujDane(znormalizujNumeracje(daneWejsciowe));
   const supabase = supabaseAdmin();
@@ -115,6 +120,18 @@ export async function zapiszWniosek(
   // Wniosek juz zlozony jest zamkniety na edycje przez klienta.
   if (istniejacy.status !== "roboczy") {
     throw new Error("Ten wniosek został już złożony i nie można go edytować.");
+  }
+
+  // Podpis zapisujemy PRZED zmianą statusu: złożony wniosek zawsze ma podpis.
+  // Skrót liczony z treści, która za chwilę trafi do bazy.
+  if (opcje.zloz && opcje.podpis) {
+    await zapiszPodpis({
+      wniosekId: istniejacy.id,
+      podpis: opcje.podpis.podpis,
+      skrotTresci: await sha256(kanonicznaTresc(dane)),
+      ip: opcje.podpis.ip,
+      userAgent: opcje.podpis.userAgent,
+    });
   }
 
   const aktualizacja: Record<string, unknown> = doWierszaWniosku(dane);
@@ -139,7 +156,7 @@ export async function zapiszWniosek(
 
   await zapiszLokalizacje(dane, istniejacy.id, istniejacy.company_id, token);
   if (opcje.zloz) {
-    await zapiszHistorie(istniejacy.id, null, "zlozenie", { status: "zlozony" });
+    await zapiszHistorie(istniejacy.id, null, "zlozenie", { status: "zlozony", podpis: Boolean(opcje.podpis) });
   }
   return { id: istniejacy.id };
 }

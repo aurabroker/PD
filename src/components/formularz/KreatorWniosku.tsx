@@ -20,6 +20,8 @@ import KrokLokalizacja from "./KrokLokalizacja";
 import WeryfikacjaRegon from "./WeryfikacjaRegon";
 import { DOKUMENTY, TRESC_ZGODY } from "@/lib/dystrybutor";
 import { pustaPozycja, sumaWykazu } from "@/lib/porzadkowanie";
+import type { Podpis } from "@/lib/podpis-wspolne";
+import PolePodpisu from "./PolePodpisu";
 import { TabelaSzkod, WykazElektroniki, WykazSprzetuMedycznego } from "./KrokiPomocnicze";
 
 type Props = {
@@ -39,6 +41,10 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
   const [stanZapisu, setStanZapisu] = useState<"bezzmian" | "zapisuje" | "zapisano" | "blad">("bezzmian");
   const [bladZapisu, setBladZapisu] = useState("");
   const [skladanie, setSkladanie] = useState(false);
+  // Podpis nie jest częścią autozapisu (waży kilkadziesiąt KB) — klient składa
+  // go na końcu, tuż przed złożeniem wniosku.
+  const [podpis, setPodpis] = useState<Podpis | null>(null);
+  const [bladPodpisu, setBladPodpisu] = useState("");
 
   const lokalizacje = metody.watch("lokalizacje") ?? [];
   const liczbaLokalizacji = Math.max(1, lokalizacje.length);
@@ -161,7 +167,7 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
 
     let wynik;
     try {
-      wynik = await akcjaZlozWniosek(token, metody.getValues());
+      wynik = await akcjaZlozWniosek(token, metody.getValues(), podpis);
     } catch {
       zlozony.current = false;
       setSkladanie(false);
@@ -177,7 +183,8 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
 
       if (wynik.bledyPol) {
         for (const [sciezka, komunikat] of Object.entries(wynik.bledyPol)) {
-          metody.setError(sciezka as never, { type: "server", message: komunikat });
+          if (sciezka === "podpis") setBladPodpisu(komunikat);
+          else metody.setError(sciezka as never, { type: "server", message: komunikat });
         }
         // Przenosimy na krok, na ktorym jest pierwszy blad (w kolejnosci krokow).
         const krokBledu = (sciezka: string) => {
@@ -187,7 +194,7 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
             : glowa === "sprzet_medyczny" ? "medyczny"
             : glowa === "elektronika_eei" ? "eei"
             : glowa === "szkody" || glowa === "brak_szkod" ? "szkody"
-            : ["zakres", "miejscowosc_podpisu", "data_podpisu", "zgoda_prawdziwosc", "zgoda_rodo", "uwagi",
+            : ["zakres", "podpis", "miejscowosc_podpisu", "data_podpisu", "zgoda_prawdziwosc", "zgoda_rodo", "uwagi",
                "posiada_polise", "towarzystwo_obecne", "nr_polisy_obecny", "waznosc_do", "roczna_skladka_obecna"].includes(glowa)
               ? "podsumowanie"
             : "firma";
@@ -240,7 +247,16 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
               <TabelaSzkod />
             </Sekcja>
           )}
-          {aktualny.klucz === "podsumowanie" && <KrokPodsumowanie />}
+          {aktualny.klucz === "podsumowanie" && (
+            <KrokPodsumowanie
+              podpis={podpis}
+              onPodpis={(p) => {
+                setPodpis(p);
+                setBladPodpisu("");
+              }}
+              bladPodpisu={bladPodpisu}
+            />
+          )}
         </div>
 
         {bladZapisu && (
@@ -443,7 +459,15 @@ function KrokDaneFirmy({ token }: { token: string }) {
   );
 }
 
-function KrokPodsumowanie() {
+function KrokPodsumowanie({
+  podpis,
+  onPodpis,
+  bladPodpisu,
+}: {
+  podpis: Podpis | null;
+  onPodpis: (p: Podpis | null) => void;
+  bladPodpisu: string;
+}) {
   const { register, watch, formState } = useFormContext<Wniosek>();
   const dane = watch();
   const bledy = formState.errors;
@@ -565,6 +589,10 @@ function KrokPodsumowanie() {
             </a>
             {" "}(otwierają się w nowej karcie, wpisane dane zostają).
           </p>
+        </div>
+
+        <div className="mt-6">
+          <PolePodpisu wartosc={podpis} onZmiana={onPodpis} blad={bladPodpisu || undefined} />
         </div>
       </Sekcja>
     </div>

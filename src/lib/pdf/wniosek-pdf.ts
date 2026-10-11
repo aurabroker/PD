@@ -22,6 +22,8 @@ export type DanePdf = {
   dane: WniosekRoboczy;
   nrReferencyjny: string;
   zlozono: Date | null;
+  /** Podpis wnioskodawcy (PNG base64) — wnioski sprzed podpisów go nie mają. */
+  podpis?: { png: string; podpisanoAt: Date; skrotTresci: string } | null;
 };
 
 // A4 w punktach
@@ -306,7 +308,7 @@ function listaZabezpieczen(pozycje: (string | false | undefined | null | "")[]):
   return widoczne.length ? widoczne.join(", ") : "brak";
 }
 
-export async function generujPdfWniosku({ dane, nrReferencyjny, zlozono }: DanePdf): Promise<Uint8Array> {
+export async function generujPdfWniosku({ dane, nrReferencyjny, zlozono, podpis: podpisWnioskodawcy }: DanePdf): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
   const zwykly = await doc.embedFont(base64NaBajty(FONT_REGULAR), { subset: true });
@@ -555,6 +557,39 @@ export async function generujPdfWniosku({ dane, nrReferencyjny, zlozono }: DaneP
   s.pola([
     ["Miejscowość i data", [dane.miejscowosc_podpisu, dane.data_podpisu].filter(Boolean).join(", ")],
   ]);
+
+  // --- Podpis wnioskodawcy ---
+  if (podpisWnioskodawcy) {
+    let obraz;
+    try {
+      obraz = await doc.embedPng(base64NaBajty(podpisWnioskodawcy.png.replace(/^data:image\/png;base64,/, "")));
+    } catch (e) {
+      console.error("[pdf] podpis nieczytelny:", e instanceof Error ? e.message : e);
+    }
+    if (obraz) {
+      const SZER_PODPISU = 190;
+      const wysPodpisu = SZER_PODPISU * (obraz.height / obraz.width);
+      s.miejsce(wysPodpisu + 52);
+      s.odstep(6);
+      s.strona.drawText("Podpis wnioskodawcy", { x: MARGINES, y: s.y - 9, size: 8.5, font: zwykly, color: KOLOR.szary });
+      const xPodpisu = MARGINES + 150;
+      s.strona.drawImage(obraz, { x: xPodpisu, y: s.y - wysPodpisu, width: SZER_PODPISU, height: wysPodpisu });
+      s.strona.drawLine({
+        start: { x: xPodpisu, y: s.y - wysPodpisu - 2 },
+        end: { x: xPodpisu + SZER_PODPISU, y: s.y - wysPodpisu - 2 },
+        thickness: 0.5,
+        color: KOLOR.szaryJasny,
+      });
+      s.y -= wysPodpisu + 6;
+      s.tekst(
+        `Podpisano elektronicznie ${dataPl(podpisWnioskodawcy.podpisanoAt)} (czas polski) w formularzu wniosku. ` +
+          `Skrót SHA-256 podpisanej treści: ${podpisWnioskodawcy.skrotTresci}`,
+        xPodpisu,
+        TRESC - 150,
+        { rozmiar: 6.5, kolor: KOLOR.szary },
+      );
+    }
+  }
 
   // --- Dystrybutor ---
   s.odstep(8);

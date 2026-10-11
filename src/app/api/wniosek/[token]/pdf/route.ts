@@ -3,6 +3,7 @@ import { biezacyAdmin } from "@/lib/autoryzacja";
 import { generujPdfWniosku } from "@/lib/pdf/wniosek-pdf";
 import { nazwaPdfWniosku } from "@/lib/powiadomienia";
 import { pobierzWniosek } from "@/lib/wnioski";
+import { pobierzPodpis } from "@/lib/podpis";
 
 /**
  * Kopia złożonego wniosku w PDF (ta sama, która idzie w mailu).
@@ -23,10 +24,12 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
     return NextResponse.json({ blad: "PDF jest dostępny po złożeniu wniosku." }, { status: 409 });
   }
 
+  const p = await pobierzPodpis(wynik.meta.id);
   const pdf = await generujPdfWniosku({
     dane: wynik.dane,
     nrReferencyjny: wynik.meta.nr_referencyjny,
     zlozono: wynik.meta.wyslano_at ? new Date(wynik.meta.wyslano_at) : null,
+    podpis: p ? { png: p.png, podpisanoAt: new Date(p.podpisano_at), skrotTresci: p.skrot_tresci } : null,
   });
 
   return new NextResponse(Buffer.from(pdf), {

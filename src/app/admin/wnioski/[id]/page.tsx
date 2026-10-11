@@ -4,6 +4,7 @@ import { kontrolaSpojnosci, sumaLokalizacji, sumaWniosku } from "@/lib/schema";
 import { zl } from "@/lib/format";
 import { POZYCJE_SUM, STATUS_ETYKIETY } from "@/lib/slowniki";
 import { jestBrak, tytulLokalizacji } from "@/lib/porzadkowanie";
+import { kanonicznaTresc, pobierzPodpis, sha256, type PodpisZBazy } from "@/lib/podpis";
 import PanelAgenta from "@/components/PanelAgenta";
 import { biezacyAgent } from "@/lib/autoryzacja";
 import { historiaWniosku, type WpisHistorii } from "@/lib/historia";
@@ -17,7 +18,14 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
   if (!wynik) notFound();
 
   const { meta, dane } = wynik;
-  const [sesja, agenci, historia] = await Promise.all([biezacyAgent(), pobierzAgentow(), historiaWniosku(meta.id)]);
+  const [sesja, agenci, historia, podpis] = await Promise.all([
+    biezacyAgent(),
+    pobierzAgentow(),
+    historiaWniosku(meta.id),
+    pobierzPodpis(meta.id),
+  ]);
+  // Czy treść w bazie to ta sama, którą klient podpisał (skrót z chwili podpisu).
+  const tresczgodna = podpis ? (await sha256(kanonicznaTresc(dane))) === podpis.skrot_tresci : null;
   const poId = new Map(agenci.map((a) => [a.user_id, a]));
   const kontrola = kontrolaSpojnosci(dane);
   const rozbieznosci = kontrola.filter((k) => !k.zgodnyMedyczny || !k.zgodnyEei);
@@ -246,6 +254,8 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
             </Karta>
           )}
 
+          {podpis && <KartaPodpisu podpis={podpis} zgodna={tresczgodna} />}
+
           <Historia wpisy={historia} agenci={poId} />
         </div>
 
@@ -349,6 +359,58 @@ function TabelaSprzetu({
   );
 }
 
+/** Podpis klienta z danymi dowodowymi i kontrolą, czy treść się nie zmieniła. */
+function KartaPodpisu({ podpis, zgodna }: { podpis: PodpisZBazy; zgodna: boolean | null }) {
+  const punkty = podpis.punkty.reduce((a, k) => a + k.length, 0);
+  const ostatni = podpis.punkty.at(-1)?.at(-1);
+  const czasMs = ostatni ? ostatni[2] : 0;
+  const rysik = podpis.punkty.some((k) => k.some((p) => p[3] !== 0.5));
+  return (
+    <section className="rounded-xl border border-stone-200 bg-white p-6" aria-label="Podpis wnioskodawcy">
+      <h2 className="naglowek-sekcji">Podpis wnioskodawcy</h2>
+      <div className="mt-4 grid gap-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="flex items-center justify-center rounded-lg border border-stone-200 bg-white p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- podpis z bazy (PNG sprawdzony przy zapisie) */}
+          <img src={`data:image/png;base64,${podpis.png}`} alt="Podpis wnioskodawcy" className="h-28 w-auto" />
+        </div>
+        <dl className="space-y-2 text-sm">
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-stone-400">Podpisano</dt>
+            <dd className="text-stone-800">
+              {new Date(podpis.podpisano_at).toLocaleString("pl-PL", { dateStyle: "long", timeStyle: "medium", timeZone: "Europe/Warsaw" })}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-stone-400">Treść wniosku</dt>
+            <dd data-podpis-zgodnosc={zgodna ? "zgodna" : "zmieniona"} className={zgodna ? "text-emerald-700" : "font-medium text-red-700"}>
+              {zgodna ? "Zgodna z podpisaną (skrót SHA-256 się zgadza)" : "Zmieniona po podpisie — skrót SHA-256 się nie zgadza"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-stone-400">Przebieg podpisu</dt>
+            <dd className="text-stone-700">
+              {podpis.punkty.length} {podpis.punkty.length === 1 ? "kreska" : "kreski/kresek"}, {punkty} punktów, {(czasMs / 1000).toFixed(1)} s
+              {rysik ? ", rysik z naciskiem" : ""}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-stone-400">Urządzenie i adres IP</dt>
+            <dd className="break-words text-xs text-stone-600">{podpis.user_agent ?? "—"} · IP {podpis.ip ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-stone-400">SHA-256 treści / obrazu</dt>
+            <dd className="break-all font-mono text-[11px] text-stone-600">
+              {podpis.skrot_tresci}
+              <br />
+              {podpis.skrot_podpisu}
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+  );
+}
+
 /** Oś zdarzeń wniosku: złożenie, zmiany statusu, przydziały — kto i kiedy. */
 function Historia({ wpisy, agenci }: { wpisy: WpisHistorii[]; agenci: Map<string, AgentSkrot> }) {
   if (wpisy.length === 0) return null;
@@ -358,7 +420,7 @@ function Historia({ wpisy, agenci }: { wpisy: WpisHistorii[]; agenci: Map<string
     const d = w.szczegoly as Record<string, unknown>;
     switch (w.zdarzenie) {
       case "zlozenie":
-        return "Klient złożył wniosek";
+        return d.podpis ? "Klient podpisał i złożył wniosek" : "Klient złożył wniosek";
       case "status": {
         const extra = [
           d.oferta_towarzystwo && `${d.oferta_towarzystwo}`,

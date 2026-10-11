@@ -11,6 +11,7 @@ import { wczytajWniosekZExcela } from "@/lib/excel/parse";
 import type { OstrzezenieImportu } from "@/lib/excel/parse";
 import { pustyWniosek, wniosekDoZlozeniaSchema, wniosekRoboczySchema, znormalizujNumeracje } from "@/lib/schema";
 import { uporzadkujDane } from "@/lib/porzadkowanie";
+import { zweryfikujPodpis } from "@/lib/podpis";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 import { utworzWniosek, zapiszWniosek } from "@/lib/wnioski";
@@ -115,24 +116,33 @@ export async function akcjaZapiszRoboczy(token: string, dane: unknown): Promise<
 }
 
 /** Zlozenie wniosku. Walidacja ostra - tu wymagane sa zgody, zakres i sumy. */
-export async function akcjaZlozWniosek(token: string, dane: unknown): Promise<WynikAkcji> {
+export async function akcjaZlozWniosek(token: string, dane: unknown, podpis?: unknown): Promise<WynikAkcji> {
   // Te same porządki co przy zapisie (piętro ze słownika, sumy z wykazu sprzętu,
   // puste wiersze wykazów) — walidujemy to, co faktycznie trafi do bazy.
   const robocze = uporzadkujDane(znormalizujNumeracje(wniosekRoboczySchema.parse(dane ?? {})));
   if (!robocze.data_podpisu) robocze.data_podpisu = dzisWarszawa();
   const wynik = wniosekDoZlozeniaSchema.safeParse(robocze);
+  // Podpis jest obowiązkowy — sprawdzamy go razem z polami, żeby klient od razu
+  // zobaczył wszystkie braki, a nie najpierw pola, a potem podpis.
+  const podpisWynik = await zweryfikujPodpis(podpis);
 
-  if (!wynik.success) {
+  if (!wynik.success || !podpisWynik.ok) {
+    const bledy = wynik.success ? {} : bledyPol(wynik.error.issues);
+    if (!podpisWynik.ok) bledy.podpis = podpisWynik.blad;
     return {
       ok: false,
-      blad: "Wniosku nie można złożyć — uzupełnij brakujące pola.",
-      bledyPol: bledyPol(wynik.error.issues),
+      blad: wynik.success ? "Wniosku nie można złożyć bez podpisu." : "Wniosku nie można złożyć — uzupełnij brakujące pola.",
+      bledyPol: bledy,
     };
   }
 
   let wniosekId: string;
   try {
-    ({ id: wniosekId } = await zapiszWniosek(token, wynik.data, { zloz: true }));
+    const h = await headers();
+    ({ id: wniosekId } = await zapiszWniosek(token, wynik.data, {
+      zloz: true,
+      podpis: { podpis: podpisWynik.podpis, ip: await ipKlienta(), userAgent: h.get("user-agent") },
+    }));
   } catch (e) {
     console.error("[akcjaZlozWniosek] blad zapisu:", e);
     return { ok: false, blad: e instanceof Error ? e.message : "Nie udało się złożyć wniosku." };

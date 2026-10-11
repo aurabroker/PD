@@ -169,6 +169,32 @@ async function wypelnijLokalizacje(page, i, sumy) {
 }
 
 /** Numer nadany przy złożeniu: format PD/…, dzisiejsza data (Warszawa), prefiks zgodny z zakresem. */
+/**
+ * Podpis myszą w polu podpisu (okno na cały ekran) — dwie kreski jak zawijas.
+ * `krotki` — sama kropka, którą formularz ma odrzucić jako „za krótki”.
+ */
+async function podpisz(page, { krotki = false } = {}) {
+  await page.getByRole("button", { name: /Podpisz (wniosek|ponownie)/ }).first().click();
+  const pole = page.locator("[data-pole-podpisu]");
+  await pole.waitFor();
+  const b = await pole.boundingBox();
+  const p = (fx, fy) => [b.x + b.width * fx, b.y + b.height * fy];
+  await page.mouse.move(...p(0.15, 0.6));
+  await page.mouse.down();
+  if (!krotki) {
+    for (let i = 1; i <= 24; i++) await page.mouse.move(...p(0.15 + i * 0.025, 0.6 - 0.25 * Math.sin(i / 2.5)));
+  }
+  await page.mouse.up();
+  if (!krotki) {
+    await page.mouse.move(...p(0.55, 0.7));
+    await page.mouse.down();
+    for (let i = 1; i <= 12; i++) await page.mouse.move(...p(0.55 + i * 0.02, 0.7 - i * 0.03));
+    await page.mouse.up();
+  }
+  await page.getByRole("button", { name: "Zatwierdź podpis" }).click();
+  if (!krotki) await page.getByRole("img", { name: "Twój podpis" }).waitFor({ timeout: 5000 });
+}
+
 function sprawdzNumer(token, skad) {
   const [nr, zakres] = sql(`select nr_referencyjny, zakres::text from mienie_wnioski where form_token='${token}'`).split("|");
   const eei = zakres.includes("Sprzęt elektroniczny (EEI)");
@@ -290,12 +316,18 @@ await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie
   sprawdz(await page.locator('input[type=checkbox][value="Kradzież z włamaniem i rabunek"]').isChecked(), "po odświeżeniu: zakres zachowany");
   sprawdz(await pole(page, "zgoda_rodo").isChecked(), "po odświeżeniu: zgoda RODO zachowana");
 
+  await podpisz(page);
+  sprawdz(await page.getByRole("img", { name: "Twój podpis" }).isVisible(), "podgląd podpisu w podsumowaniu");
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
   await page.waitForURL(/\/zlozony$/, { timeout: 20000 });
   sprawdz(await page.getByText("Dziękujemy").isVisible(), "strona potwierdzenia po złożeniu");
   const potw = await page.locator("main").innerText();
   sprawdz(/(PD|PD\/EEI|EEI)\/\d{8}\/[A-HJ-NP-Z2-9]{6}/.test(potw), "numer referencyjny (PD/…) widoczny na potwierdzeniu", potw.slice(0, 200));
   sprawdzNumer(token, "T1");
+  const [pngDl, kresek, skrotT, skrotP, uaPodp] = sql(`select length(p.png), jsonb_array_length(p.punkty), p.skrot_tresci, p.skrot_podpisu, coalesce(p.user_agent,'')
+      from mienie_podpisy p join mienie_wnioski w on w.id=p.wniosek_id where w.form_token='${token}'`).split("|");
+  sprawdz(Number(pngDl) > 1000 && kresek === "2", "DB: podpis zapisany (PNG + 2 kreski przebiegu)", `${pngDl} B, ${kresek} kreski`);
+  sprawdz(/^[0-9a-f]{64}$/.test(skrotT ?? "") && /^[0-9a-f]{64}$/.test(skrotP ?? "") && uaPodp.length > 10, "DB: skróty SHA-256 treści i obrazu, urządzenie zapisane");
 
   // Maile po złożeniu: klient (kopia PDF + dystrybutor + RODO) i zespół. W replice nie ma
   // klucza Resend, więc wysyłka kończy się błędem konfiguracji — ale wiersz w dzienniku
@@ -338,7 +370,13 @@ await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie
     sprawdz(/Aura Expert sp\. z o\.o\..*KNF 11229690\/A/.test(tekstPdf) && /Strona 1 z \d/.test(tekstPdf), "PDF: stopka dystrybutora i numeracja stron");
     let obrazyPdf = "";
     try { obrazyPdf = execSync(`pdfimages -list ${JSON.stringify(sciezkaPdf)}`, { encoding: "utf-8" }); } catch { /* brak poppler-utils */ }
-    if (obrazyPdf) sprawdz(/^\s*1\s+\d+\s+image/m.test(obrazyPdf), "PDF: logo Aura Expert osadzone na 1. stronie", obrazyPdf.split("\n").slice(2, 4).join(" | "));
+    if (obrazyPdf) {
+      sprawdz(/^\s*1\s+\d+\s+image/m.test(obrazyPdf), "PDF: logo Aura Expert osadzone na 1. stronie", obrazyPdf.split("\n").slice(2, 4).join(" | "));
+      const obrazy = obrazyPdf.split("\n").filter((l) => /\simage\s/.test(l)).length;
+      sprawdz(obrazy >= 2, "PDF: osadzony obraz podpisu (logo + podpis)", `obrazów: ${obrazy}`);
+    }
+    const [, skrotTPdf] = sql(`select 1, p.skrot_tresci from mienie_podpisy p join mienie_wnioski w on w.id=p.wniosek_id where w.form_token='${token}'`).split("|");
+    sprawdz(tekstPdf.replace(/\s+/g, "").includes(skrotTPdf) && /Podpis wnioskodawcy/.test(tekstPdf), "PDF: podpis z datą i pełnym skrótem SHA-256 treści", skrotTPdf);
   } else {
     console.log("  (pdftotext niedostępny — pomijam sprawdzenie treści PDF)");
   }
@@ -511,6 +549,7 @@ await uruchom("T7 import Excela przez stronę i złożenie", async ({ page }) =>
   sprawdz((await pole(page, "miejscowosc_podpisu").inputValue()) === "Warszawa", "import: „Warszawa, 22.09.2026” rozdzielone — sama miejscowość");
   await zaznacz(page, "zgoda_prawdziwosc");
   await zaznacz(page, "zgoda_rodo");
+  await podpisz(page);
   // W pliku lokalizacja 2 nie ma roku budowy i dachu — złożenie ma na to wskazać.
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
   await page.getByText("Podaj rok budowy", { exact: false }).first().waitFor({ timeout: 15000 });
@@ -519,6 +558,7 @@ await uruchom("T7 import Excela przez stronę i złożenie", async ({ page }) =>
   await wpisz(page, "lokalizacje.1.rok_budowy", "2012");
   await wybierz(page, "lokalizacje.1.pokrycie_dachu", "Strop żelbetowy (flat)");
   await krok(page, "Podsumowanie");
+  sprawdz(await page.getByRole("img", { name: "Twój podpis" }).isVisible(), "podpis zostaje po nieudanej próbie złożenia");
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
   await page.waitForURL(/\/zlozony$/, { timeout: 20000 });
   const r = sql(`select status, suma_lacznie from mienie_wnioski where form_token='${token}'`);
@@ -564,6 +604,21 @@ await uruchom("T9 telefon (390x844): pełne złożenie", async ({ page, ctx }) =
   await page.locator('input[type=checkbox][value="Mienie od ognia i zdarzeń losowych"]').check();
   await wpisz(page, "miejscowosc_podpisu", "Kraków");
   await zaznacz(page, "zgoda_prawdziwosc"); await zaznacz(page, "zgoda_rodo");
+  await page.getByRole("button", { name: /Podpisz wniosek/ }).click();
+  const okno = await page.getByRole("dialog", { name: "Podpis wnioskodawcy" }).boundingBox();
+  sprawdz(okno && okno.width >= 389 && okno.height >= 800, "telefon: okno podpisu na cały ekran", JSON.stringify(okno));
+  sprawdz(await page.getByText("Obróć telefon poziomo").isVisible(), "telefon pionowo: podpowiedź, by obrócić telefon");
+  await page.getByRole("button", { name: "Anuluj" }).click();
+  // Telefon poziomo (niski ekran): okno na cały ekran, przyciski w zasięgu.
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.getByRole("button", { name: /Podpisz wniosek/ }).click();
+  const zatw = await page.getByRole("button", { name: "Zatwierdź podpis" }).boundingBox();
+  const poleP = await page.locator("[data-pole-podpisu]").boundingBox();
+  sprawdz(zatw && zatw.y >= 0 && zatw.y + zatw.height <= 390, "telefon poziomo: „Zatwierdź podpis” w całości na ekranie", JSON.stringify(zatw));
+  sprawdz(poleP && poleP.width >= 500, "telefon poziomo: duże pole podpisu", JSON.stringify(poleP));
+  await page.getByRole("button", { name: "Anuluj" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await podpisz(page);
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
   await page.waitForURL(/\/zlozony$/, { timeout: 20000 });
   const r = sql(`select status from mienie_wnioski where form_token='${token}'`);
@@ -1060,6 +1115,9 @@ await uruchom("T24 wniosek jak od klienta: bez NIP, EEI bez sumy, wykaz sprzętu
   }
   await wpisz(page, "miejscowosc_podpisu", "Białystok 24-09-2026");
   await zaznacz(page, "zgoda_prawdziwosc"); await zaznacz(page, "zgoda_rodo");
+  await podpisz(page, { krotki: true });
+  sprawdz(await page.getByText("Podpis jest za krótki", { exact: false }).isVisible(), "kropka zamiast podpisu — „Podpis jest za krótki”");
+  await page.getByRole("button", { name: "Anuluj" }).click();
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
   await page.getByText("Podaj NIP").waitFor({ timeout: 15000 });
   sprawdz(/\/wniosek\/[^/]+$/.test(page.url()), "wniosek bez NIP nie przechodzi");
@@ -1073,6 +1131,7 @@ await uruchom("T24 wniosek jak od klienta: bez NIP, EEI bez sumy, wykaz sprzętu
   await krok(page, "Podsumowanie");
   sprawdz(await page.getByText(/Zaznaczono sprzęt elektroniczny \(EEI\)/).isVisible(), "EEI w zakresie bez sumy — komunikat przy zakresie");
   sprawdz(await page.getByText("Wpisz samą miejscowość", { exact: false }).isVisible(), "data w polu miejscowości — komunikat");
+  sprawdz(await page.getByText("Podpisz wniosek w polu podpisu").isVisible(), "bez podpisu — komunikat przy polu podpisu");
   const s24 = sql(`select status from mienie_wnioski where form_token='${token}'`);
   sprawdz(s24 === "roboczy", "DB: wniosek nadal roboczy", s24);
 }, browser);
@@ -1086,6 +1145,10 @@ await uruchom("T25 wykaz sprzętu do .xlsx dla ubezpieczyciela (panel)", async (
   sprawdz(bezLogowania.status === 401, "bez logowania: 401", String(bezLogowania.status));
   await zaloguj(page, ADMIN.email, ADMIN.haslo);
   await page.goto(`${APP}/admin/wnioski/${id}`);
+  const kartaPodpisu = page.getByRole("region", { name: "Podpis wnioskodawcy" });
+  sprawdz(await kartaPodpisu.getByRole("img", { name: "Podpis wnioskodawcy" }).isVisible(), "panel: podpis klienta na karcie wniosku");
+  sprawdz((await kartaPodpisu.locator("[data-podpis-zgodnosc]").getAttribute("data-podpis-zgodnosc")) === "zgodna",
+    "panel: treść w bazie zgodna z podpisaną (skrót SHA-256 po odczycie z bazy)");
   const link = page.getByRole("link", { name: "Wykaz sprzętu (.xlsx)" });
   sprawdz(await link.isVisible(), "przycisk „Wykaz sprzętu (.xlsx)” na karcie wniosku");
   const [dl] = await Promise.all([page.waitForEvent("download"), link.click()]);
