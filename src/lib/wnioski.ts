@@ -144,15 +144,24 @@ export async function zapiszWniosek(
 
   // Numer z prefiksem zakresu nadajemy dopiero przy złożeniu (patrz numeracja.ts).
   // Kolizja końcówki (unikalny indeks) jest skrajnie mało prawdopodobna — losujemy ponownie.
+  // Warunek na status w samym UPDATE: autozapis z drugiej karty, który odczytał
+  // status tuż przed złożeniem, nie nadpisze treści już złożonego (podpisanego) wniosku.
   let error: { message: string; code?: string } | null = null;
+  let zapisane: { id: string }[] | null = null;
   for (let proba = 0; proba < 5; proba++) {
     if (opcje.zloz) aktualizacja.nr_referencyjny = nadajNumer(dane.zakres, new Date(teraz));
-    ({ error } = await supabase.from("mienie_wnioski").update(aktualizacja).eq("id", istniejacy.id));
+    ({ data: zapisane, error } = await supabase
+      .from("mienie_wnioski")
+      .update(aktualizacja)
+      .eq("id", istniejacy.id)
+      .eq("status", "roboczy")
+      .select("id"));
     const kolizjaNumeru = error?.code === "23505" && /nr_referencyjny/.test(error.message);
     if (!opcje.zloz || !kolizjaNumeru) break;
   }
 
   if (error) throw new Error(`Nie udało się zapisać wniosku: ${error.message}`);
+  if (!zapisane?.length) throw new Error("Ten wniosek został już złożony i nie można go edytować.");
 
   await zapiszLokalizacje(dane, istniejacy.id, istniejacy.company_id, token);
   if (opcje.zloz) {

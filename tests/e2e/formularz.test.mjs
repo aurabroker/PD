@@ -1198,6 +1198,17 @@ await uruchom("T26 panel bez logowania: żądanie RSC z pominięciem layoutu nie
   }
 }, browser);
 
+await uruchom("T27 nagłówki bezpieczeństwa (zakaz osadzania w ramce, HSTS, nosniff)", async () => {
+  for (const sciezka of ["/", "/login", "/api/stan"]) {
+    const h = (await fetch(APP + sciezka, { redirect: "manual" })).headers;
+    sprawdz(h.get("x-frame-options") === "DENY" && /frame-ancestors 'none'/.test(h.get("content-security-policy") ?? ""),
+      `${sciezka}: zakaz osadzania w cudzej ramce`, `${h.get("x-frame-options")} | ${h.get("content-security-policy")}`);
+    sprawdz(/max-age=\d+/.test(h.get("strict-transport-security") ?? "") && h.get("x-content-type-options") === "nosniff"
+      && Boolean(h.get("referrer-policy")) && /camera=\(\)/.test(h.get("permissions-policy") ?? ""),
+      `${sciezka}: HSTS, nosniff, Referrer-Policy, Permissions-Policy`);
+  }
+}, browser);
+
 await browser.close();
 
 // ---------------------------------------------------------------------------
