@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { supabaseAdmin } from "./supabase/admin";
 import { supabaseServer } from "./supabase/server";
@@ -71,6 +72,20 @@ export const biezacyAgent = cache(async (): Promise<{ user: User; agent: Agent }
  */
 export async function biezacyAdmin(): Promise<User | null> {
   return (await biezacyAgent())?.user ?? null;
+}
+
+/**
+ * Brama kazdej strony panelu: sesja agenta albo przekierowanie na logowanie.
+ *
+ * Sprawdzenie w layoucie /admin nie wystarcza. Przy nawigacji Next renderuje
+ * tylko zmieniony segment (partial rendering): zadanie RSC, ktore deklaruje,
+ * ze layout jest juz na ekranie, dostaje sama strone - bez wykonania layoutu.
+ * Dlatego kazda strona pod /admin wola te funkcje, ZANIM pobierze dane.
+ */
+export async function wymaganyAgent() {
+  const sesja = await biezacyAgent();
+  if (!sesja) redirect("/login");
+  return sesja;
 }
 
 /** Tylko rola admin: zarzadzanie agentami, Health, przydzial cudzych wnioskow. */

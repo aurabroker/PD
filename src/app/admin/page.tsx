@@ -1,4 +1,4 @@
-import { biezacyAgent } from "@/lib/autoryzacja";
+import { wymaganyAgent } from "@/lib/autoryzacja";
 import { STATUS, STATUS_ETYKIETY } from "@/lib/slowniki";
 import { zl } from "@/lib/format";
 import {
@@ -29,8 +29,8 @@ const ALERTY: { klucz: keyof Liczniki["uwaga"]; etykieta: string }[] = [
 const pct = (v: number | null) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 
 export default async function PanelGlowny({ searchParams }: { searchParams: Promise<Parametry> }) {
+  const sesja = await wymaganyAgent();
   const { status, szukaj, agent: filtrAgenta, uwaga } = await searchParams;
-  const sesja = (await biezacyAgent())!;
 
   let wnioski: WierszWniosku[] = [];
   let agenci: AgentSkrot[] = [];

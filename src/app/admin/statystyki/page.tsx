@@ -1,3 +1,4 @@
+import { wymaganyAgent } from "@/lib/autoryzacja";
 import { zl } from "@/lib/format";
 import { STATUS_ETYKIETY, type Status } from "@/lib/slowniki";
 import { policzStatystyki, type Okres, type Rozklad } from "@/lib/statystyki";
@@ -54,6 +55,7 @@ function Kolumny({ tytul, dane }: { tytul: string; dane: { miesiac: string; wart
 }
 
 export default async function Statystyki({ searchParams }: { searchParams: Promise<{ okres?: string }> }) {
+  await wymaganyAgent();
   const { okres: o } = await searchParams;
   const okres: Okres = OKRESY.some((x) => x.klucz === o) ? (o as Okres) : "365";
 

@@ -38,6 +38,7 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 | T23 | strona główna: logo Aura Expert w nagłówku, favicon, sekcja „Nasze serwisy” (4 serwisy, Beauty Polisa „Wkrótce”) |
 | T24 | wniosek jak od klienta: bez NIP, EEI bez sumy, data w polu miejscowości — złożenie zablokowane z komunikatami; suma sprzętu z wykazu (tylko do odczytu), pusty wiersz wykazu usunięty |
 | T25 | wykaz sprzętu do .xlsx z panelu: 401 bez logowania, arkusze medyczny/EEI, kwoty jako liczby, sumy |
+| T26 | panel bez logowania: żądanie nawigacji (RSC), które pomija layout `/admin`, nie zwraca listy, statystyk ani szczegółów wniosku — każda strona sama wymaga sesji |
 
 Korpus złośliwych plików do T14 generuje `tests/e2e/generuj-zlosliwe.mjs`
 (bez zależności, sam z szablonu i wypełnionego wniosku). Można go uruchomić

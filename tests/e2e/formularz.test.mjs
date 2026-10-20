@@ -1172,6 +1172,32 @@ await uruchom("T25 wykaz sprzętu do .xlsx dla ubezpieczyciela (panel)", async (
   sprawdz(a2.includes(nr) && a2.includes("Salon Testowy Ąę"), "nagłówek arkusza: numer wniosku i ubezpieczający", a2);
 }, browser);
 
+await uruchom("T26 panel bez logowania: żądanie RSC z pominięciem layoutu nie zwraca danych", async () => {
+  // Żądanie nawigacji (RSC) deklaruje, że layout /admin jest już na ekranie — Next renderuje
+  // wtedy samą stronę. Strona musi sama wymagać sesji, inaczej oddaje dane bez logowania.
+  const drzewo = (...segmenty) => {
+    let wezel = ["__PAGE__", {}];
+    for (const s of [...segmenty].reverse()) wezel = [s, { children: wezel }];
+    return encodeURIComponent(JSON.stringify(["", { children: wezel }, null, null, true]));
+  };
+  const id = sql(`select id from mienie_wnioski where status<>'roboczy' order by created_at limit 1`);
+  const email = sql(`select email_kontaktowy from mienie_wnioski where email_kontaktowy like '%@%' limit 1`);
+  const proby = [
+    ["/admin?agent=brak", drzewo("admin", "statystyki")],
+    ["/admin?status=roboczy", drzewo("admin", "statystyki")],
+    ["/admin/statystyki", drzewo("admin", "agenci")],
+    [`/admin/wnioski/${id}`, drzewo("admin", "wnioski", ["id", "00000000-0000-4000-8000-000000000000", "d"])],
+  ];
+  for (const [sciezka, tree] of proby) {
+    const odp = await fetch(APP + sciezka, { headers: { RSC: "1", "Next-Router-State-Tree": tree }, redirect: "manual" });
+    const tresc = await odp.text();
+    const dane = (email && tresc.includes(email)) || /"NIP "|Lejek|Suma ubezpieczenia wg kategorii/.test(tresc);
+    const naLogowanie = (odp.status >= 300 && odp.status < 400) || tresc.includes("/login");
+    sprawdz(!dane && naLogowanie, `bez logowania ${sciezka}: brak danych, przekierowanie na logowanie`,
+      `HTTP ${odp.status}, ${tresc.length} B`);
+  }
+}, browser);
+
 await browser.close();
 
 // ---------------------------------------------------------------------------

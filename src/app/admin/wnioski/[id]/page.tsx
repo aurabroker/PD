@@ -6,20 +6,20 @@ import { POZYCJE_SUM, STATUS_ETYKIETY } from "@/lib/slowniki";
 import { jestBrak, tytulLokalizacji } from "@/lib/porzadkowanie";
 import { kanonicznaTresc, pobierzPodpis, sha256, type PodpisZBazy } from "@/lib/podpis";
 import PanelAgenta from "@/components/PanelAgenta";
-import { biezacyAgent } from "@/lib/autoryzacja";
+import { wymaganyAgent } from "@/lib/autoryzacja";
 import { historiaWniosku, type WpisHistorii } from "@/lib/historia";
 import { nazwaAgenta, pobierzAgentow, type AgentSkrot } from "@/lib/statystyki";
 
 export const dynamic = "force-dynamic";
 
 export default async function SzczegolyWniosku({ params }: { params: Promise<{ id: string }> }) {
+  const sesja = await wymaganyAgent();
   const { id } = await params;
   const wynik = await pobierzWniosekPoId(id);
   if (!wynik) notFound();
 
   const { meta, dane } = wynik;
-  const [sesja, agenci, historia, podpis] = await Promise.all([
-    biezacyAgent(),
+  const [agenci, historia, podpis] = await Promise.all([
     pobierzAgentow(),
     historiaWniosku(meta.id),
     pobierzPodpis(meta.id),
@@ -270,7 +270,7 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
           zgodnosc={meta.import_zgodnosc ?? null}
           przypisanyAgent={meta.przypisany_agent ?? null}
           agenci={agenci.filter((a) => a.aktywny).map((a) => ({ user_id: a.user_id, nazwa: nazwaAgenta(a) }))}
-          ja={{ user_id: sesja!.agent.user_id, admin: sesja!.agent.rola === "admin" }}
+          ja={{ user_id: sesja.agent.user_id, admin: sesja.agent.rola === "admin" }}
           oferta={{
             oferta_towarzystwo: meta.oferta_towarzystwo ?? null,
             oferta_skladka: meta.oferta_skladka ?? null,
