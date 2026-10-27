@@ -191,3 +191,10 @@ export const POZYCJE_SUM = [
 ] as const;
 
 export type KluczSumy = (typeof POZYCJE_SUM)[number]["klucz"];
+
+/**
+ * Nazwa ostatniego kroku formularza (zakres, zgody, podpis, „Złóż wniosek”) — ta sama
+ * w nawigacji formularza i w mailach. Dawniej „Podsumowanie”: brzmiało jak przegląd
+ * danych, więc klienci kończyli przed nim i myśleli, że wniosek poszedł.
+ */
+export const KROK_KONCOWY = "Zakres, zgody i podpis";

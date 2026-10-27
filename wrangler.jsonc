@@ -1,7 +1,8 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "mienie-wnioski",
-  "main": ".open-next/worker.js",
+  // Własny punkt wejścia: handler OpenNext (.open-next/worker.js) + harmonogram przypomnień.
+  "main": "cloudflare-worker.mjs",
   "compatibility_date": "2026-09-22",
   // Wymagane przez ExcelJS (node:stream, node:zlib, node:buffer).
   // Od daty zgodnosci 2026-08-04 flaga jest domyslna, ale zostawiamy ja jawnie,
@@ -21,6 +22,11 @@
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
+  },
+  // Codziennie o 8:05 UTC (9:05 zimą, 10:05 latem w Polsce): przypomnienia o niezłożonych
+  // wnioskach (src/lib/przypomnienia.ts, wywołanie w cloudflare-worker.mjs).
+  "triggers": {
+    "crons": ["5 8 * * *"]
   },
   "observability": {
     "enabled": true

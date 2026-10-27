@@ -68,6 +68,23 @@ zaimportować bez straty danych.
 Import **nigdy nie składa wniosku automatycznie**: tworzy wersję roboczą, pokazuje
 ostrzeżenia (wartości spoza słownika, sprzeczne pola) i czeka na potwierdzenie klienta.
 
+### Wnioski niezłożone: link i przypomnienia
+
+Zapis roboczy to nie złożenie — klienci często o tym nie wiedzieli. Dlatego:
+
+- **„Zapisz i dokończ później”** wysyła klientowi mail z linkiem do wniosku
+  (`wyslijLinkDoWniosku` w `src/lib/przypomnienia.ts`; najwyżej 3 na dobę, ten sam adres
+  nie częściej niż co 15 minut). Adres z literówką w domenie (`gmial.com`) dostaje
+  podpowiedź w formularzu i nie dostaje maila (`src/lib/email-adres.ts`).
+- **Przypomnienia automatyczne** — cron Workera (`triggers.crons` w `wrangler.jsonc`,
+  codziennie 8:05 UTC). `cloudflare-worker.mjs` opakowuje handler OpenNext i w `scheduled()`
+  woła `POST /api/cron/przypomnienia` z kluczem wyprowadzonym z `SUPABASE_SERVICE_ROLE_KEY`
+  (`src/lib/cron.ts`). Zasady: 2 dni bez zmian → pierwsze, 7 dni później → drugie, potem koniec;
+  pomijane adresy odbite (bounce) i klienci, którzy złożyli już inny wniosek.
+  Administrator może podejrzeć decyzje bez wysyłki: `POST /api/cron/przypomnienia?proba=1`.
+- Nieudana próba złożenia (braki w polach) trafia do historii wniosku jako `proba_zlozenia` —
+  agent widzi, co zatrzymało klienta.
+
 ### Dostęp
 
 - **Agent** — e-mail i hasło na `/login`, plus wpis w tabeli `katalog_admins`.

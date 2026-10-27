@@ -40,6 +40,9 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 | T25 | wykaz sprzętu do .xlsx z panelu: 401 bez logowania, arkusze medyczny/EEI, kwoty jako liczby, sumy |
 | T26 | panel bez logowania: żądanie nawigacji (RSC), które pomija layout `/admin`, nie zwraca listy, statystyk ani szczegółów wniosku — każda strona sama wymaga sesji |
 | T27 | nagłówki bezpieczeństwa na stronie, logowaniu i API: zakaz osadzania w cudzej ramce (`X-Frame-Options`, `frame-ancestors`), HSTS, nosniff, Referrer-Policy, Permissions-Policy |
+| T28 | „wniosek niezłożony” wprost: pasek statusu z numerem kroku, ostatni krok „Zakres, zgody i podpis”, podpowiedź literówki w domenie e-maila, „Zapisz i dokończ później” → panel z linkiem i wysyłka linku (limit 3 na dobę), bez e-maila — link do skopiowania |
+| T29 | przycisk „Dalej: zakres, zgody i podpis →”, informacja o mailu po złożeniu, nieudana próba złożenia zapisana w historii z listą braków |
+| T30 | przypomnienia automatyczne: zasady (2 dni bez zmian, najwyżej 2, drugie po 7 dniach, bez odbitych adresów, bez klientów, którzy złożyli inny wniosek, bez szkiców sprzed września, bez literówek), klucz crona (401 bez/z błędnym), tryb próby, harmonogram Workera (`/__scheduled`) |
 
 Korpus złośliwych plików do T14 generuje `tests/e2e/generuj-zlosliwe.mjs`
 (bez zależności, sam z szablonu i wypełnionego wniosku). Można go uruchomić
@@ -71,7 +74,7 @@ cp .env.local .env.local.kopia
 node tests/e2e/klucze-jwt.mjs > .env.local
 set -a; source .env.local; set +a
 npm run cf:build
-npx wrangler dev --port 8800 --local &
+npx wrangler dev --port 8800 --local --test-scheduled --var SUPABASE_SERVICE_ROLE_KEY:$SUPABASE_SERVICE_ROLE_KEY &
 
 # 4. Test
 npm i --no-save playwright

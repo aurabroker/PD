@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FormProvider, useFieldArray, useForm, useFormContext } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { akcjaZapiszRoboczy, akcjaZlozWniosek } from "@/app/actions/wniosek";
+import { akcjaZapiszIWyslijLink, akcjaZapiszRoboczy, akcjaZlozWniosek } from "@/app/actions/wniosek";
+import type { WynikLinku } from "@/lib/przypomnienia";
+import { sprawdzAdresEmail } from "@/lib/email-adres";
 import { pustaLokalizacja, sumaWniosku, wniosekSchema } from "@/lib/schema";
 import type { Wniosek } from "@/lib/schema";
 import {
   FORMA_PRAWNA,
+  KROK_KONCOWY,
   LICZBA_PRACOWNIKOW,
   POZYCJE_SUM,
   ROCZNY_OBROT,
@@ -45,6 +48,9 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
   // go na końcu, tuż przed złożeniem wniosku.
   const [podpis, setPodpis] = useState<Podpis | null>(null);
   const [bladPodpisu, setBladPodpisu] = useState("");
+  // Wynik „Zapisz i dokończ później”: czy link poszedł mailem i dokąd.
+  const [naPozniej, setNaPozniej] = useState<WynikLinku | null>(null);
+  const [zapisNaPozniej, setZapisNaPozniej] = useState(false);
 
   const lokalizacje = metody.watch("lokalizacje") ?? [];
   const liczbaLokalizacji = Math.max(1, lokalizacje.length);
@@ -56,7 +62,7 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
       { klucz: "medyczny", etykieta: "Sprzęt medyczny" },
       { klucz: "eei", etykieta: "Elektronika" },
       { klucz: "szkody", etykieta: "Szkodowość" },
-      { klucz: "podsumowanie", etykieta: "Podsumowanie" },
+      { klucz: "podsumowanie", etykieta: KROK_KONCOWY },
     ],
     [lokalizacje.length],
   );
@@ -148,6 +154,37 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
     };
   }, [metody, zapisz]);
 
+  /**
+   * „Zapisz i dokończ później”: zapis + link do wniosku na e-mail klienta.
+   * Czeka na trwający autozapis, żeby nie ścigać się z nim o kolejność.
+   */
+  async function zapiszNaPozniej() {
+    if (zlozony.current) return;
+    if (timer.current) clearTimeout(timer.current);
+    while (trwaZapis.current) await new Promise((r) => setTimeout(r, 100));
+    trwaZapis.current = true;
+    setZapisNaPozniej(true);
+    setStanZapisu("zapisuje");
+    setBladZapisu("");
+    try {
+      const wynik = await akcjaZapiszIWyslijLink(token, metody.getValues());
+      if (wynik.ok) {
+        setStanZapisu("zapisano");
+        setNaPozniej(wynik.link ?? null);
+      } else {
+        setStanZapisu("blad");
+        setBladZapisu(wynik.blad);
+      }
+    } catch {
+      setStanZapisu("blad");
+      setBladZapisu("Brak połączenia — dane są w formularzu, zapiszemy je przy następnej zmianie.");
+    } finally {
+      trwaZapis.current = false;
+      setZapisNaPozniej(false);
+      if (czekaZapis.current) void zapisz();
+    }
+  }
+
   async function zloz() {
     setSkladanie(true);
     setBladZapisu("");
@@ -216,6 +253,18 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
           <WskaznikZapisu stan={stanZapisu} onZapisz={zapisz} />
         </div>
 
+        {/* Stała informacja: zapis to nie wysłanie. Klienci zamykali formularz po „Zapisano”,
+            myśląc, że wniosek trafił do agenta. */}
+        <p data-status-wniosku="roboczy"
+          className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+          <strong>Krok {Math.min(krok, kroki.length - 1) + 1} z {kroki.length}</strong>
+          <span aria-hidden="true">·</span>
+          <span>
+            Wniosek <strong>nie jest jeszcze złożony</strong> — trafi do agenta dopiero po kliknięciu
+            {" "}„Złóż wniosek” w ostatnim kroku „{KROK_KONCOWY}”.
+          </span>
+        </p>
+
         {zImportu && (
           <div className="mb-6 rounded-lg border border-marka-200 bg-marka-50 p-4 text-sm text-marka-900">
             Dane wczytaliśmy z Twojego arkusza. <strong>Sprawdź je krok po kroku</strong> — wniosek
@@ -263,6 +312,15 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
           <p className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">{bladZapisu}</p>
         )}
 
+        {naPozniej && (
+          <PanelZapisanoNaPozniej
+            wynik={naPozniej}
+            onZamknij={() => setNaPozniej(null)}
+            doDanychFirmy={() => { setNaPozniej(null); setKrok(0); }}
+            doKonca={() => { setNaPozniej(null); setKrok(kroki.length - 1); }}
+          />
+        )}
+
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-6">
           <button type="button" onClick={() => setKrok((k) => Math.max(0, k - 1))}
             disabled={krok === 0} className="przycisk-drugi">
@@ -270,13 +328,13 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
           </button>
 
           <div className="flex gap-3">
-            <button type="button" onClick={zapisz} className="przycisk-drugi">
+            <button type="button" onClick={zapiszNaPozniej} disabled={zapisNaPozniej} className="przycisk-drugi">
               Zapisz i dokończ później
             </button>
             {krok < kroki.length - 1 ? (
               <button type="button" onClick={() => setKrok((k) => Math.min(kroki.length - 1, k + 1))}
                 className="przycisk-glowny">
-                Dalej →
+                {krok === kroki.length - 2 ? `Dalej: ${KROK_KONCOWY.toLowerCase()} →` : "Dalej →"}
               </button>
             ) : (
               <button type="button" onClick={zloz} disabled={skladanie} className="przycisk-glowny">
@@ -285,6 +343,12 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
             )}
           </div>
         </div>
+        {krok === kroki.length - 1 && (
+          <p className="mt-3 text-right text-xs text-stone-500">
+            Po kliknięciu „Złóż wniosek” wniosek trafi do agenta, a na Twój e-mail przyjdzie potwierdzenie
+            z numerem wniosku i kopią w PDF. Bez tego maila wniosek nie został złożony.
+          </p>
+        )}
       </div>
     </FormProvider>
   );
@@ -292,7 +356,7 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
 
 function WskaznikZapisu({ stan, onZapisz }: { stan: string; onZapisz: () => void }) {
   if (stan === "zapisuje") return <span className="text-sm text-stone-500">Zapisuję…</span>;
-  if (stan === "zapisano") return <span className="text-sm text-emerald-700">Zapisano ✓</span>;
+  if (stan === "zapisano") return <span className="text-sm text-stone-600">Wersja robocza zapisana ✓</span>;
   if (stan === "blad")
     return (
       <button type="button" onClick={onZapisz} className="text-sm text-red-600 underline">
@@ -300,6 +364,114 @@ function WskaznikZapisu({ stan, onZapisz }: { stan: string; onZapisz: () => void
       </button>
     );
   return <span className="text-sm text-stone-400">Zapis automatyczny włączony</span>;
+}
+
+/**
+ * Wynik „Zapisz i dokończ później” — w treści strony, nie w oknie: klient może dalej
+ * wypełniać, a panel mówi wprost, że wniosek NIE został złożony i gdzie jest link.
+ */
+function PanelZapisanoNaPozniej({
+  wynik,
+  onZamknij,
+  doDanychFirmy,
+  doKonca,
+}: {
+  wynik: WynikLinku;
+  onZamknij: () => void;
+  doDanychFirmy: () => void;
+  doKonca: () => void;
+}) {
+  const [skopiowano, setSkopiowano] = useState(false);
+  const adres = "adres" in wynik ? wynik.adres : undefined;
+
+  let opis: ReactNode;
+  if (wynik.wyslano) {
+    opis = (
+      <>
+        Link do dokończenia wysłaliśmy na <strong>{wynik.adres}</strong>. Nie widzisz maila w ciągu
+        kilku minut? Sprawdź folder spam albo popraw adres w kroku „Dane firmy”.
+      </>
+    );
+  } else if (wynik.powod === "niedawno") {
+    opis = <>Link wysłaliśmy już przed chwilą na <strong>{adres}</strong>.</>;
+  } else if (wynik.powod === "brak_emaila") {
+    opis = <>Nie ma adresu e-mail, więc nie możemy wysłać linku. Skopiuj go i zachowaj — albo wpisz e-mail w kroku „Dane firmy”.</>;
+  } else if (wynik.powod === "zly_email") {
+    opis = (
+      <>
+        Adres <strong>{adres}</strong> wygląda na błędny
+        {"sugestia" in wynik && wynik.sugestia ? <> — czy chodziło o <strong>{wynik.sugestia}</strong>?</> : null}.
+        Popraw go w kroku „Dane firmy”, a link wyślemy przy następnym zapisie. Na razie skopiuj link poniżej.
+      </>
+    );
+  } else if (wynik.powod === "limit") {
+    opis = <>Link do tego wniosku wysłaliśmy już dziś kilka razy. Skopiuj go poniżej.</>;
+  } else {
+    opis = <>Nie udało się wysłać maila z linkiem. Skopiuj link poniżej i zachowaj go.</>;
+  }
+
+  async function kopiuj() {
+    try {
+      await navigator.clipboard.writeText(wynik.link);
+      setSkopiowano(true);
+    } catch {
+      setSkopiowano(false);
+    }
+  }
+
+  return (
+    <section role="status" aria-live="polite" aria-label="Wniosek zapisany"
+      className="mt-6 rounded-xl border border-marka-200 bg-marka-50 p-5 text-sm text-stone-800">
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-base font-semibold text-stone-900">Wniosek zapisany — jeszcze nie złożony</p>
+        <button type="button" onClick={onZamknij} className="text-xs text-stone-500 hover:text-stone-800">Zamknij</button>
+      </div>
+      <p className="mt-2 leading-relaxed">{opis}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input readOnly value={wynik.link} aria-label="Link do wniosku" onFocus={(e) => e.currentTarget.select()}
+          className="pole min-w-0 flex-1 bg-white text-xs" />
+        <button type="button" onClick={kopiuj} className="przycisk-drugi">{skopiowano ? "Skopiowano ✓" : "Kopiuj link"}</button>
+      </div>
+      <p className="mt-3 text-stone-600">
+        Agent dostanie wniosek dopiero po kliknięciu „Złóż wniosek” w ostatnim kroku „{KROK_KONCOWY}”.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-3">
+        {(!wynik.wyslano && (wynik.powod === "brak_emaila" || wynik.powod === "zly_email")) && (
+          <button type="button" onClick={doDanychFirmy} className="text-sm font-medium text-marka-700 hover:text-marka-900">
+            Popraw e-mail →
+          </button>
+        )}
+        <button type="button" onClick={doKonca} className="text-sm font-medium text-marka-700 hover:text-marka-900">
+          Przejdź do ostatniego kroku →
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * E-mail kontaktowy z podpowiedzią literówki w domenie („gmial.com” → „gmail.com”).
+ * Na ten adres idzie link do wniosku, potwierdzenie złożenia i przypomnienia.
+ */
+function PoleEmail() {
+  const { register, watch, setValue, formState } = useFormContext<Wniosek>();
+  const wynik = sprawdzAdresEmail(watch("email_kontaktowy"));
+  return (
+    <div>
+      <Pole etykieta="E-mail kontaktowy" typ="email" wymagane blad={formState.errors.email_kontaktowy}
+        podpowiedz="Na ten adres wyślemy link do wniosku i potwierdzenie złożenia."
+        rejestracja={register("email_kontaktowy")} atrybuty={{ autoComplete: "email", inputMode: "email" }} />
+      {wynik.stan === "podejrzany" && (
+        <p className="mt-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900" data-podpowiedz-email="">
+          Czy chodziło o <strong>{wynik.sugestia}</strong>?{" "}
+          <button type="button" className="font-medium underline"
+            onClick={() => setValue("email_kontaktowy", wynik.sugestia, { shouldDirty: true, shouldValidate: true })}>
+            Popraw
+          </button>
+        </p>
+      )}
+    </div>
+  );
 }
 
 function NawigacjaKrokow({
@@ -412,8 +584,7 @@ function KrokDaneFirmy({ token }: { token: string }) {
             <Pole etykieta="Adres siedziby" wymagane blad={bledy.adres_siedziby}
               rejestracja={register("adres_siedziby")} />
           </div>
-          <Pole etykieta="E-mail kontaktowy" typ="email" wymagane blad={bledy.email_kontaktowy}
-            rejestracja={register("email_kontaktowy")} />
+          <PoleEmail />
           <Pole etykieta="Telefon" wymagane blad={bledy.telefon} rejestracja={register("telefon")} />
           <Pole etykieta="Osoba do kontaktu" rejestracja={register("osoba_kontaktu")} />
           <Pole etykieta="Stanowisko" rejestracja={register("stanowisko")} />

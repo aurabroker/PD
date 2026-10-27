@@ -35,8 +35,8 @@ export default function StronaGlowna() {
           <span className="naglowek-sekcji">Wypełnij online</span>
           <h2 className="mt-2 text-lg font-medium">Formularz krok po kroku</h2>
           <p className="mt-2 flex-1 text-sm text-stone-600">
-            Osiem kroków, sumy liczone automatycznie, zapis w trakcie wypełniania. Do wniosku możesz
-            wrócić później — dostaniesz link.
+            Sumy liczone automatycznie, zapis w trakcie wypełniania. Gdy przerwiesz, wyślemy Ci link
+            do dokończenia. Wniosek trafia do agenta po kliknięciu „Złóż wniosek” w ostatnim kroku.
           </p>
           <PrzyciskNowyWniosek />
         </div>

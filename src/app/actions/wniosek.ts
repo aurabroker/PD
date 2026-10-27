@@ -18,6 +18,8 @@ import { utworzWniosek, zapiszWniosek } from "@/lib/wnioski";
 import { powiadomOZlozeniu } from "@/lib/powiadomienia";
 import { adresAplikacji } from "@/lib/adres-aplikacji";
 import { STATUS } from "@/lib/slowniki";
+import { wyslijLinkDoWniosku, type WynikLinku } from "@/lib/przypomnienia";
+import { zapiszHistorie } from "@/lib/historia";
 
 export type WynikAkcji =
   | { ok: true; komunikat?: string }
@@ -115,6 +117,24 @@ export async function akcjaZapiszRoboczy(token: string, dane: unknown): Promise<
   }
 }
 
+export type WynikZapisuZLinkiem = WynikAkcji & { link?: WynikLinku };
+
+/**
+ * „Zapisz i dokończ później”: zapis roboczy + link do wniosku na e-mail klienta.
+ * Bez maila z linkiem klient, który zamknął kartę, nie miał jak wrócić — i często
+ * myślał, że wniosek poszedł. Wysyłka ma limity (wyslijLinkDoWniosku w lib/przypomnienia.ts).
+ */
+export async function akcjaZapiszIWyslijLink(token: string, dane: unknown): Promise<WynikZapisuZLinkiem> {
+  const zapis = await akcjaZapiszRoboczy(token, dane);
+  if (!zapis.ok) return zapis;
+  try {
+    return { ...zapis, link: await wyslijLinkDoWniosku(token, await adresAplikacji()) };
+  } catch (e) {
+    console.error("[akcjaZapiszIWyslijLink] wysylka linku:", e);
+    return { ...zapis, link: { wyslano: false, powod: "blad", link: `${await adresAplikacji()}/wniosek/${token}` } };
+  }
+}
+
 /** Zlozenie wniosku. Walidacja ostra - tu wymagane sa zgody, zakres i sumy. */
 export async function akcjaZlozWniosek(token: string, dane: unknown, podpis?: unknown): Promise<WynikAkcji> {
   // Te same porządki co przy zapisie (piętro ze słownika, sumy z wykazu sprzętu,
@@ -129,6 +149,12 @@ export async function akcjaZlozWniosek(token: string, dane: unknown, podpis?: un
   if (!wynik.success || !podpisWynik.ok) {
     const bledy = wynik.success ? {} : bledyPol(wynik.error.issues);
     if (!podpisWynik.ok) bledy.podpis = podpisWynik.blad;
+    // Ślad dla agenta: klient próbował złożyć i zatrzymały go te pola.
+    // Bez tego „porzucony” wniosek i wniosek odbity od walidacji wyglądały w panelu tak samo.
+    const dostep = await wniosekZTokenu(token);
+    if (dostep?.wniosek?.status === "roboczy") {
+      await zapiszHistorie(dostep.wniosek.id, null, "proba_zlozenia", { pola: Object.keys(bledy).slice(0, 40) });
+    }
     return {
       ok: false,
       blad: wynik.success ? "Wniosku nie można złożyć bez podpisu." : "Wniosku nie można złożyć — uzupełnij brakujące pola.",

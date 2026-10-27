@@ -1,7 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "./supabase/admin";
 
-export type Zdarzenie = "zlozenie" | "status" | "przydzial" | "email";
+export type Zdarzenie = "zlozenie" | "status" | "przydzial" | "email" | "proba_zlozenia";
 
 /**
  * Wpis do historii wniosku. Best-effort: blad zapisu historii nie moze

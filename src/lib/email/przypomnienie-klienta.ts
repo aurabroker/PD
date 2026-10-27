@@ -1,9 +1,12 @@
 import { DOKUMENTY, DYSTRYBUTOR } from "../dystrybutor";
+import { KROK_KONCOWY } from "../slowniki";
 import { FONT, KOLOR, naglowekMaila } from "./marka";
 import { h, INFORMACJA_O_DYSTRYBUTORZE_SKROT, KLAUZULA_RODO_SKROT, type Wiadomosc } from "./potwierdzenie-klienta";
 
 /**
- * Przypomnienie dla klienta, który zaczął wniosek, ale go nie złożył.
+ * Mail do klienta z wnioskiem niezłożonym — dwa warianty tej samej wiadomości:
+ *  - „link”: wysyłany od razu po „Zapisz i dokończ później” (link do powrotu),
+ *  - „przypomnienie”: po kilku dniach bez złożenia (ręcznie albo automatycznie).
  *
  * Wiadomość czysto usługowa (dotyczy wniosku, który klient sam rozpoczął) — bez banerów
  * i oferty innych produktów. Najważniejsze, co ma z niej wynikać: wniosek NIE został
@@ -12,6 +15,7 @@ import { h, INFORMACJA_O_DYSTRYBUTORZE_SKROT, KLAUZULA_RODO_SKROT, type Wiadomos
  */
 
 export type DanePrzypomnienia = {
+  rodzaj?: "link" | "przypomnienie";
   nazwaFirmy: string;
   /** Pełny link do wniosku (adres aplikacji + /wniosek/<token>). */
   link: string;
@@ -26,8 +30,21 @@ const data = (d: Date) =>
   d.toLocaleDateString("pl-PL", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Warsaw" });
 
 export function mailPrzypomnienieKlienta(d: DanePrzypomnienia): Wiadomosc {
-  const temat = "Twój wniosek o ubezpieczenie majątkowe nie został jeszcze złożony";
-  const zapowiedz = "Dane są zapisane. Do złożenia brakuje ostatniego kroku: zakres, zgody, podpis i przycisk „Złóż wniosek”.";
+  const link = d.rodzaj === "link";
+  const temat = link
+    ? "Link do Twojego wniosku o ubezpieczenie majątkowe — wniosek nie jest jeszcze złożony"
+    : "Twój wniosek o ubezpieczenie majątkowe nie został jeszcze złożony";
+  const zapowiedz = link
+    ? "Wniosek zapisany. Wróć przez ten link, a na koniec kliknij „Złóż wniosek”."
+    : "Dane są zapisane. Do złożenia brakuje ostatniego kroku: zakres, zgody, podpis i przycisk „Złóż wniosek”.";
+  const etykieta = link ? "Wniosek zapisany — niezłożony" : "Wniosek niezłożony";
+  const tytul = link ? "Dokończ wniosek, kiedy chcesz" : "Twój wniosek czeka na złożenie";
+  const wstep = link
+    ? "jest zapisany. Możesz wrócić do niego w dowolnej chwili przez przycisk poniżej. <strong>Wniosek nie został jeszcze złożony</strong> — trafi do agenta dopiero po kliknięciu „Złóż wniosek” w ostatnim kroku."
+    : "jest zapisany, ale <strong>nie został jeszcze złożony</strong>. Nie trafił więc do agenta i nie możemy przygotować oferty.";
+  const wstepTekst = link
+    ? "jest zapisany. Możesz wrócić do niego w dowolnej chwili przez link poniżej. WNIOSEK NIE ZOSTAŁ JESZCZE ZŁOŻONY — trafi do agenta dopiero po kliknięciu „Złóż wniosek” w ostatnim kroku."
+    : "jest zapisany, ale NIE ZOSTAŁ JESZCZE ZŁOŻONY.\nNie trafił więc do agenta i nie możemy przygotować oferty.";
   const baza = d.adresAplikacji.replace(/\/$/, "");
   const notaRodo = `${baza}/dokumenty/${DOKUMENTY.rodo.plik}`;
   const infoDystrybutor = `${baza}/dokumenty/${DOKUMENTY.dystrybutor.plik}`;
@@ -57,20 +74,20 @@ export function mailPrzypomnienieKlienta(d: DanePrzypomnienia): Wiadomosc {
     ${naglowekMaila({ logo: d.logo, podpis: "Ubezpieczenie majątkowe salonów beauty" }, h)}
 
     <tr><td style="padding:28px 28px 8px;">
-      <div style="${FONT}font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:${KOLOR.marka};">Wniosek niezłożony</div>
-      <h1 style="${FONT}margin:6px 0 16px;font-size:22px;line-height:28px;color:${KOLOR.tekst};">Twój wniosek czeka na złożenie</h1>
+      <div style="${FONT}font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:${KOLOR.marka};">${h(etykieta)}</div>
+      <h1 style="${FONT}margin:6px 0 16px;font-size:22px;line-height:28px;color:${KOLOR.tekst};">${h(tytul)}</h1>
       <p style="${FONT}margin:0 0 12px;font-size:15px;line-height:22px;color:${KOLOR.tekst};">Dzień dobry,</p>
       <p style="${FONT}margin:0;font-size:15px;line-height:22px;color:${KOLOR.tekst};">
         wniosek o ubezpieczenie majątkowe${firma ? ` dla <strong>${h(firma)}</strong>` : ""}, rozpoczęty ${h(data(d.rozpoczeto))},
-        jest zapisany, ale <strong>nie został jeszcze złożony</strong>. Nie trafił więc do agenta i nie możemy przygotować oferty.
+        ${wstep}
       </p>
     </td></tr>
 
     <tr><td style="padding:20px 28px 4px;">
-      <div style="${FONT}font-size:16px;font-weight:700;color:${KOLOR.tekst};padding-bottom:6px;">Do złożenia zostało kilka minut</div>
+      <div style="${FONT}font-size:16px;font-weight:700;color:${KOLOR.tekst};padding-bottom:6px;">${link ? "Jak złożyć wniosek" : "Do złożenia zostało kilka minut"}</div>
       <table role="presentation" cellpadding="0" cellspacing="0">
         ${krok(1, "Otwórz wniosek przyciskiem poniżej — wpisane dane czekają, nie trzeba zaczynać od nowa.")}
-        ${krok(2, "Przejdź do ostatniego kroku <strong>„Podsumowanie”</strong>: zaznacz zakres ubezpieczenia i zgody, wpisz miejscowość i podpisz się palcem albo myszą.")}
+        ${krok(2, `Uzupełnij brakujące dane i przejdź do ostatniego kroku <strong>„${KROK_KONCOWY}”</strong>: zaznacz zakres ubezpieczenia i zgody, wpisz miejscowość i podpisz się palcem albo myszą.`)}
         ${krok(3, "Kliknij <strong>„Złóż wniosek”</strong>. Zaraz potem przyjdzie e-mail z numerem wniosku i kopią w PDF — to znak, że wniosek do nas dotarł.")}
       </table>
     </td></tr>
@@ -102,7 +119,7 @@ export function mailPrzypomnienieKlienta(d: DanePrzypomnienia): Wiadomosc {
       <p style="${FONT}margin:0 0 12px;font-size:11px;line-height:16px;color:${KOLOR.szary};">${h(KLAUZULA_RODO_SKROT)}
         <a href="${h(notaRodo)}" style="color:${KOLOR.marka};">Pełna nota informacyjna RODO</a>.</p>
       <p style="${FONT}margin:0;font-size:11px;line-height:16px;color:${KOLOR.szaryJasny};">
-        Wiadomość dotyczy wniosku rozpoczętego w serwisie ${h(baza.replace(/^https?:\/\//, ""))}. Wysyłamy ją, bo wniosek nie został złożony.
+        Wiadomość dotyczy wniosku rozpoczętego w serwisie ${h(baza.replace(/^https?:\/\//, ""))}. ${link ? "Wysłaliśmy ją, bo zapisano wniosek do dokończenia później." : "Wysyłamy ją, bo wniosek nie został złożony."}
       </p>
     </td></tr>
 
@@ -115,13 +132,12 @@ export function mailPrzypomnienieKlienta(d: DanePrzypomnienia): Wiadomosc {
   const tekst = [
     `Dzień dobry,`,
     ``,
-    `wniosek o ubezpieczenie majątkowe${firma ? ` dla ${firma}` : ""}, rozpoczęty ${data(d.rozpoczeto)}, jest zapisany, ale NIE ZOSTAŁ JESZCZE ZŁOŻONY.`,
-    `Nie trafił więc do agenta i nie możemy przygotować oferty.`,
+    `wniosek o ubezpieczenie majątkowe${firma ? ` dla ${firma}` : ""}, rozpoczęty ${data(d.rozpoczeto)}, ${wstepTekst}`,
     ``,
-    `Do złożenia zostało kilka minut:`,
+    link ? `Jak złożyć wniosek:` : `Do złożenia zostało kilka minut:`,
     `1. Otwórz wniosek: ${d.link}`,
     `   Wpisane dane czekają, nie trzeba zaczynać od nowa.`,
-    `2. Przejdź do ostatniego kroku „Podsumowanie”: zaznacz zakres ubezpieczenia i zgody, wpisz miejscowość i podpisz się palcem albo myszą.`,
+    `2. Uzupełnij brakujące dane i przejdź do ostatniego kroku „${KROK_KONCOWY}”: zaznacz zakres ubezpieczenia i zgody, wpisz miejscowość i podpisz się palcem albo myszą.`,
     `3. Kliknij „Złóż wniosek”. Zaraz potem przyjdzie e-mail z numerem wniosku i kopią w PDF.`,
     ...(d.linkWazny ? [``, `Link jest ważny do ${data(d.linkWazny)}.`] : []),
     ``,

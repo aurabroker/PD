@@ -82,7 +82,7 @@ async function zaznacz(page, nazwa, stan = true) {
 async function krok(page, etykieta) {
   await page.getByRole("navigation", { name: "Kroki wniosku" }).getByRole("button", { name: new RegExp(etykieta) }).click();
 }
-async function dalej(page) { await page.getByRole("button", { name: "Dalej →" }).click(); }
+async function dalej(page) { await page.getByRole("button", { name: /^Dalej/ }).click(); }
 
 /**
  * Wpis daty tak, jak przyjdzie z Safari z polem tekstowym zamiast kalendarza.
@@ -105,7 +105,7 @@ async function stanZapisu(page, limitMs = 12000) {
   const start = Date.now();
   let ostatni = "";
   while (Date.now() - start < limitMs) {
-    const zapisano = await page.getByText("Zapisano ✓").isVisible().catch(() => false);
+    const zapisano = await page.getByText("Wersja robocza zapisana ✓").isVisible().catch(() => false);
     const blad = await page.getByText(/Nie zapisano/).isVisible().catch(() => false);
     const trwa = await page.getByText("Zapisuję…").isVisible().catch(() => false);
     ostatni = zapisano ? "zapisano" : blad ? "blad" : trwa ? "trwa" : "brak";
@@ -312,7 +312,7 @@ await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie
   sprawdz((await pole(page, "lokalizacje.1.adres").inputValue()).includes("Testowa 2"), "po odświeżeniu: adres lokalizacji 2 zachowany");
   await krok(page, "Sprzęt medyczny");
   sprawdz((await pole(page, "sprzet_medyczny.2.nazwa").inputValue()) === "HIFU", "po odświeżeniu: 3. urządzenie medyczne zachowane");
-  await krok(page, "Podsumowanie");
+  await krok(page, "Zakres, zgody i podpis");
   sprawdz(await page.locator('input[type=checkbox][value="Kradzież z włamaniem i rabunek"]').isChecked(), "po odświeżeniu: zakres zachowany");
   sprawdz(await pole(page, "zgoda_rodo").isChecked(), "po odświeżeniu: zgoda RODO zachowana");
 
@@ -462,7 +462,7 @@ await uruchom("T3 błędny NIP w trakcie wypełniania", async ({ page }) => {
 // ---------------------------------------------------------------------------
 await uruchom("T4 próba złożenia pustego wniosku", async ({ page }) => {
   const token = await nowyWniosek(page);
-  await krok(page, "Podsumowanie");
+  await krok(page, "Zakres, zgody i podpis");
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
   await page.waitForTimeout(2500);
   sprawdz(/\/wniosek\/[^/]+$/.test(page.url()), "nie przeszło do potwierdzenia");
@@ -545,7 +545,7 @@ await uruchom("T7 import Excela przez stronę i złożenie", async ({ page }) =>
   sprawdz(zg7 === "true", "DB: wypełniony oryginalny szablon rozpoznany jako zgodny", zg7);
   await krok(page, "Lokalizacja 1");
   sprawdz((await pole(page, "lokalizacje.0.pietro").inputValue()) === "Parter", "import: piętro „0” z arkusza zamienione na „Parter”");
-  await krok(page, "Podsumowanie");
+  await krok(page, "Zakres, zgody i podpis");
   sprawdz((await pole(page, "miejscowosc_podpisu").inputValue()) === "Warszawa", "import: „Warszawa, 22.09.2026” rozdzielone — sama miejscowość");
   await zaznacz(page, "zgoda_prawdziwosc");
   await zaznacz(page, "zgoda_rodo");
@@ -557,7 +557,7 @@ await uruchom("T7 import Excela przez stronę i złożenie", async ({ page }) =>
   sprawdz(await page.getByText("Wybierz pokrycie dachu").isVisible(), "komunikat o brakującym pokryciu dachu przy polu");
   await wpisz(page, "lokalizacje.1.rok_budowy", "2012");
   await wybierz(page, "lokalizacje.1.pokrycie_dachu", "Strop żelbetowy (flat)");
-  await krok(page, "Podsumowanie");
+  await krok(page, "Zakres, zgody i podpis");
   sprawdz(await page.getByRole("img", { name: "Twój podpis" }).isVisible(), "podpis zostaje po nieudanej próbie złożenia");
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
   await page.waitForURL(/\/zlozony$/, { timeout: 20000 });
@@ -582,7 +582,7 @@ await uruchom("T8 skrajne dane: minus, ogromne kwoty, długi tekst", async ({ pa
   const stan = await stanZapisu(page);
   sprawdz(stan === "zapisano" || stan === "blad", "formularz nie zawiesza się przy skrajnych danych", stan);
   sprawdz(await page.getByText("Kwota nie może być ujemna").isVisible(), "komunikat o ujemnej kwocie od razu przy polu (po opuszczeniu pola)");
-  await krok(page, "Podsumowanie");
+  await krok(page, "Zakres, zgody i podpis");
   await zaznacz(page, "zgoda_prawdziwosc"); await zaznacz(page, "zgoda_rodo");
   await page.locator('input[type=checkbox][value="Mienie od ognia i zdarzeń losowych"]').check();
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
@@ -600,7 +600,7 @@ await uruchom("T9 telefon (390x844): pełne złożenie", async ({ page, ctx }) =
   await wypelnijDaneFirmy(page);
   await dalej(page);
   await wypelnijLokalizacje(page, 0, { suma_wyposazenie: 50000 });
-  await krok(page, "Podsumowanie");
+  await krok(page, "Zakres, zgody i podpis");
   await page.locator('input[type=checkbox][value="Mienie od ognia i zdarzeń losowych"]').check();
   await wpisz(page, "miejscowosc_podpisu", "Kraków");
   await zaznacz(page, "zgoda_prawdziwosc"); await zaznacz(page, "zgoda_rodo");
@@ -675,7 +675,7 @@ await uruchom("T11 ten sam wniosek w dwóch kartach naraz", async ({ page, ctx }
 await uruchom("T12 data wpisana ręcznie jak w Safari (pole tekstowe)", async ({ page }) => {
   const token = await nowyWniosek(page);
   await wypelnijDaneFirmy(page);
-  await krok(page, "Podsumowanie");
+  await krok(page, "Zakres, zgody i podpis");
 
   /*
    * Chromium nie pozwala wpisac do pola daty nic poza RRRR-MM-DD (React przywraca
@@ -1109,7 +1109,7 @@ await uruchom("T24 wniosek jak od klienta: bez NIP, EEI bez sumy, wykaz sprzętu
   sprawdz((await stanZapisu(page)) === "zapisano", "autozapis po dodaniu wykazu");
   const lok = sql(`select l.suma_sprzet_medyczny from mienie_lokalizacje l join mienie_wnioski w on w.id=l.wniosek_id where w.form_token='${token}'`);
   sprawdz(Number(lok) === 230000, "DB: autozapis zapisał sumę sprzętu z wykazu", lok);
-  await krok(page, "Podsumowanie");
+  await krok(page, "Zakres, zgody i podpis");
   for (const z of ["Mienie od ognia i zdarzeń losowych", "Sprzęt elektroniczny (EEI)", "Sprzęt medyczny / aparatura"]) {
     await page.locator(`input[type=checkbox][value="${z}"]`).check();
   }
@@ -1128,7 +1128,7 @@ await uruchom("T24 wniosek jak od klienta: bez NIP, EEI bez sumy, wykaz sprzętu
   for (const t of ["Wybierz piętro z listy", "Podaj rok budowy", "Wybierz materiał ścian", "Wybierz stan techniczny"]) {
     sprawdz(await page.getByText(t, { exact: false }).first().isVisible(), `lokalizacja: „${t}”`);
   }
-  await krok(page, "Podsumowanie");
+  await krok(page, "Zakres, zgody i podpis");
   sprawdz(await page.getByText(/Zaznaczono sprzęt elektroniczny \(EEI\)/).isVisible(), "EEI w zakresie bez sumy — komunikat przy zakresie");
   sprawdz(await page.getByText("Wpisz samą miejscowość", { exact: false }).isVisible(), "data w polu miejscowości — komunikat");
   sprawdz(await page.getByText("Podpisz wniosek w polu podpisu").isVisible(), "bez podpisu — komunikat przy polu podpisu");
@@ -1207,6 +1207,117 @@ await uruchom("T27 nagłówki bezpieczeństwa (zakaz osadzania w ramce, HSTS, no
       && Boolean(h.get("referrer-policy")) && /camera=\(\)/.test(h.get("permissions-policy") ?? ""),
       `${sciezka}: HSTS, nosniff, Referrer-Policy, Permissions-Policy`);
   }
+}, browser);
+
+await uruchom("T28 „wniosek niezłożony” wprost: pasek statusu, nazwa ostatniego kroku, podpowiedź e-maila, link mailem", async ({ page }) => {
+  const token = await nowyWniosek(page);
+  const pasek = page.locator('[data-status-wniosku="roboczy"]');
+  sprawdz(await pasek.isVisible(), "pasek statusu widoczny od pierwszego kroku");
+  sprawdz(/Krok 1 z \d+/.test(await pasek.innerText()) && /nie jest jeszcze złożony/.test(await pasek.innerText()),
+    "pasek: numer kroku i „nie jest jeszcze złożony”", await pasek.innerText());
+  const nawigacja = page.getByRole("navigation", { name: "Kroki wniosku" });
+  sprawdz(await nawigacja.getByRole("button", { name: /Zakres, zgody i podpis/ }).isVisible(), "ostatni krok nazywa się „Zakres, zgody i podpis”");
+  sprawdz((await nawigacja.getByRole("button", { name: /Podsumowanie/ }).count()) === 0, "brak kroku „Podsumowanie”");
+
+  await wpisz(page, "nazwa_firmy", "Salon Przypomnień");
+  await wpisz(page, "email_kontaktowy", "klientka@gmial.com");
+  const podpowiedz = page.locator("[data-podpowiedz-email]");
+  sprawdz(await podpowiedz.isVisible() && /klientka@gmail\.com/.test(await podpowiedz.innerText()), "literówka w domenie: „czy chodziło o …@gmail.com”");
+  await podpowiedz.getByRole("button", { name: "Popraw" }).click();
+  sprawdz((await pole(page, "email_kontaktowy").inputValue()) === "klientka@gmail.com", "„Popraw” wstawia poprawny adres");
+  sprawdz(!(await podpowiedz.isVisible().catch(() => false)), "po poprawce podpowiedź znika");
+
+  await page.getByRole("button", { name: "Zapisz i dokończ później" }).click();
+  const panel = page.getByRole("status", { name: "Wniosek zapisany" });
+  await panel.waitFor({ timeout: 15000 });
+  sprawdz(/jeszcze nie złożony/.test(await panel.innerText()), "panel po zapisie: „Wniosek zapisany — jeszcze nie złożony”");
+  const link = await panel.getByRole("textbox", { name: "Link do wniosku" }).inputValue();
+  sprawdz(link.endsWith(`/wniosek/${token}`), "panel pokazuje link do tego wniosku", link);
+  // W replice nie ma klucza Resend — wysyłka kończy się błędem, ale próba ma ślad w dzienniku.
+  const maile = () => sql(`select count(*) from mienie_emaile e join mienie_wnioski w on w.id=e.wniosek_id
+                           where w.form_token='${token}' and e.typ='link_do_wniosku' and e.do_kogo='klientka@gmail.com'`);
+  sprawdz(maile() === "1", "DB: próba wysyłki linku na adres z wniosku", maile());
+  for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Zapisz i dokończ później" }).click();
+  await page.waitForTimeout(1500);
+  sprawdz(Number(maile()) <= 3, "limit: najwyżej 3 linki do wniosku na dobę", maile());
+  sprawdz(sql(`select status from mienie_wnioski where form_token='${token}'`) === "roboczy", "DB: wniosek nadal roboczy (zapis ≠ złożenie)");
+
+  // Bez e-maila: link do skopiowania i wskazówka, że trzeba wpisać adres.
+  await wpisz(page, "email_kontaktowy", "");
+  await page.getByRole("button", { name: "Zapisz i dokończ później" }).click();
+  await page.waitForTimeout(1500);
+  sprawdz(/Nie ma adresu e-mail/.test(await panel.innerText()), "bez e-maila: informacja i link do skopiowania", await panel.innerText());
+}, browser);
+
+await uruchom("T29 przejście do ostatniego kroku i nieudana próba złożenia zostawia ślad dla agenta", async ({ page }) => {
+  const token = await nowyWniosek(page);
+  await wpisz(page, "nazwa_firmy", "Salon Bez Zakresu");
+  await krok(page, "Szkodowość");
+  sprawdz(await page.getByRole("button", { name: "Dalej: zakres, zgody i podpis →" }).isVisible(), "przycisk na przedostatnim kroku mówi, dokąd prowadzi");
+  await page.getByRole("button", { name: "Dalej: zakres, zgody i podpis →" }).click();
+  sprawdz(await page.getByText("Bez tego maila wniosek nie został złożony").isVisible(), "ostatni krok: co się stanie po „Złóż wniosek”");
+  await page.getByRole("button", { name: "Złóż wniosek" }).click();
+  await page.waitForTimeout(2500);
+  const proba = sql(`select h.szczegoly->>'pola' from mienie_historia h join mienie_wnioski w on w.id=h.wniosek_id
+                     where w.form_token='${token}' and h.zdarzenie='proba_zlozenia'`);
+  sprawdz(/zakres/.test(proba) && /podpis/.test(proba), "DB: historia „klient próbował złożyć” z listą braków", proba.slice(0, 200));
+}, browser);
+
+await uruchom("T30 przypomnienia automatyczne: zasady, klucz crona, harmonogram Workera", async () => {
+  const { createHash } = await import("node:crypto");
+  const klucz = createHash("sha256").update(`cron-przypomnienia:${process.env.SUPABASE_SERVICE_ROLE_KEY}`).digest("hex");
+  const dni = (n) => `now() - interval '${n} days'`;
+  // INSERT … RETURNING wypisuje w psql także „INSERT 0 1” — stąd CTE i zwykły SELECT.
+  const nowy = (tag, email, opcje = {}) => sql(`with n as (insert into mienie_wnioski (form_token, nazwa_firmy, email_kontaktowy, nip, status, token_wygasa, created_at, updated_at)
+    values ('t30-${tag}-${Date.now()}', 'T30 ${tag}', '${email}', '${opcje.nip ?? ""}', '${opcje.status ?? "roboczy"}',
+            ${opcje.bezWaznosci ? "null" : "now() + interval '40 days'"}, ${dni(opcje.utworzono ?? 5)}, ${dni(opcje.zmiana ?? 3)})
+    returning nr_referencyjny || '|' || id as w) select w from n`).split("|");
+  const mail = (id, typ, email, status, blad, ileDni) => sql(`insert into mienie_emaile (wniosek_id, typ, do_kogo, status, blad, created_at)
+    values ('${id}', '${typ}', '${email}', '${status}', ${blad ? `'${blad}'` : "null"}, ${dni(ileDni)})`);
+
+  const [nrA] = nowy("a", "a@t30.pl");
+  const [nrB] = nowy("b", "b@t30.pl", { zmiana: 1 });
+  const [nrC, idC] = nowy("c", "c@t30.pl");
+  mail(idC, "przypomnienie_klienta", "c@t30.pl", "wyslany", null, 20); mail(idC, "przypomnienie_klienta", "c@t30.pl", "wyslany", null, 10);
+  const [nrD, idD] = nowy("d", "d@t30.pl");
+  mail(idD, "przypomnienie_klienta", "d@t30.pl", "blad", "Odbity przez serwer odbiorcy (bounce)", 4);
+  const [nrE] = nowy("e", "e@t30.pl", { nip: "5252525252" });
+  nowy("e-zlozony", "inny@t30.pl", { nip: "5252525252", status: "zlozony", utworzono: 1, zmiana: 1 });
+  const [nrF] = nowy("f", "f@t30.pl", { bezWaznosci: true });
+  const [nrG, idG] = nowy("g", "g@t30.pl");
+  mail(idG, "przypomnienie_klienta", "g@t30.pl", "wyslany", null, 3);
+  const [nrH] = nowy("h", "h@gmial.com");
+
+  const wolaj = (naglowki = {}, proba = false) =>
+    fetch(`${APP}/api/cron/przypomnienia${proba ? "?proba=1" : ""}`, { method: "POST", headers: naglowki });
+  sprawdz((await wolaj()).status === 401, "bez klucza: 401");
+  sprawdz((await wolaj({ "x-cron-klucz": "0".repeat(64) })).status === 401, "zły klucz: 401");
+
+  const odpProba = await wolaj({ "x-cron-klucz": klucz }, true);
+  const proba = await odpProba.json();
+  const decyzja = (nr) => proba.decyzje.find((d) => d.nr === nr);
+  sprawdz(odpProba.status === 200 && proba.proba === true, "próba z kluczem: 200, bez wysyłki", JSON.stringify(proba).slice(0, 200));
+  sprawdz(decyzja(nrA)?.decyzja === "do_wyslania", "A: 3 dni bez zmian → przypomnienie", JSON.stringify(decyzja(nrA)));
+  sprawdz(!decyzja(nrB), "B: zmiana wczoraj → jeszcze nie");
+  sprawdz(decyzja(nrC)?.decyzja === "pominiete" && /dwa/.test(decyzja(nrC).powod), "C: po dwóch przypomnieniach — koniec", JSON.stringify(decyzja(nrC)));
+  sprawdz(decyzja(nrD)?.decyzja === "pominiete" && /odbity/.test(decyzja(nrD).powod), "D: adres wcześniej odbity — pomijamy", JSON.stringify(decyzja(nrD)));
+  sprawdz(decyzja(nrE)?.decyzja === "pominiete" && /inny/.test(decyzja(nrE).powod), "E: ten sam NIP złożył inny wniosek — pomijamy", JSON.stringify(decyzja(nrE)));
+  sprawdz(!decyzja(nrF), "F: link bez daty ważności (szkic sprzed września) — pomijamy");
+  sprawdz(decyzja(nrG)?.decyzja === "pominiete" && /7 dni/.test(decyzja(nrG).powod), "G: drugie przypomnienie dopiero po 7 dniach", JSON.stringify(decyzja(nrG)));
+  sprawdz(!decyzja(nrH), "H: adres z literówką w domenie — bez wysyłki");
+  const przedWysylka = sql(`select count(*) from mienie_emaile e join mienie_wnioski w on w.id=e.wniosek_id where w.nazwa_firmy='T30 a'`);
+  sprawdz(przedWysylka === "0", "próba niczego nie wysłała", przedWysylka);
+
+  const odp = await (await wolaj({ "x-cron-klucz": klucz })).json();
+  const a = odp.decyzje.find((d) => d.nr === nrA);
+  sprawdz(a?.decyzja === "blad" && /Brak konfiguracji/.test(a.powod ?? ""), "A: wysyłka podjęta (w replice brak klucza Resend)", JSON.stringify(a));
+  const wpisA = () => sql(`select count(*) from mienie_emaile e join mienie_wnioski w on w.id=e.wniosek_id where w.nazwa_firmy='T30 a' and e.typ='przypomnienie_klienta'`);
+  sprawdz(wpisA() === "1", "DB: próba przypomnienia w dzienniku maili", wpisA());
+
+  // Harmonogram Workera (scheduled) — ten sam endpoint, wywołany przez cloudflare-worker.mjs.
+  const sched = await fetch(`${APP}/__scheduled?cron=${encodeURIComponent("5 8 * * *")}`);
+  await new Promise((r) => setTimeout(r, 2500));
+  sprawdz(sched.status === 200 && wpisA() === "2", "cron Workera uruchamia przebieg przypomnień", `HTTP ${sched.status}, wpisów: ${wpisA()}`);
 }, browser);
 
 await browser.close();

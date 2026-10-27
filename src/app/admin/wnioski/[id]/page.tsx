@@ -434,10 +434,19 @@ function Historia({ wpisy, agenci }: { wpisy: WpisHistorii[]; agenci: Map<string
       case "przydzial":
         return d.na ? `Przypisano: ${kto(String(d.na))}${d.przejecie ? " (przejęcie przy obsłudze)" : ""}` : "Zwrócono do puli";
       case "email":
-        if (d.typ !== "przypomnienie_klienta") return "Wysłano e-mail";
-        return d.odbity
-          ? `Przypomnienie o dokończeniu wniosku NIE DOTARŁO — adres ${d.do ?? ""} odbity, prawdopodobnie błędny`
-          : `Wysłano klientowi przypomnienie o dokończeniu wniosku${d.do ? ` (${d.do})` : ""}`;
+        if (d.typ !== "przypomnienie_klienta" && d.typ !== "link_do_wniosku") return "Wysłano e-mail";
+        {
+          const co = d.typ === "link_do_wniosku"
+            ? "Link do wniosku (klient zapisał wniosek na później)"
+            : `${d.automatyczne ? "Automatyczne przypomnienie" : "Przypomnienie"}${d.ktore ? ` nr ${d.ktore}` : ""} o dokończeniu wniosku`;
+          return d.odbity
+            ? `${co} NIE DOTARŁO — adres ${d.do ?? ""} odbity, prawdopodobnie błędny`
+            : `${co} — wysłano na ${d.do ?? "adres z wniosku"}`;
+        }
+      case "proba_zlozenia": {
+        const pola = Array.isArray(d.pola) ? (d.pola as string[]) : [];
+        return `Klient próbował złożyć wniosek — zatrzymały go braki (${pola.length}): ${pola.slice(0, 8).join(", ")}${pola.length > 8 ? "…" : ""}`;
+      }
       default:
         return w.zdarzenie;
     }
