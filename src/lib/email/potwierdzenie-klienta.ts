@@ -53,21 +53,27 @@ function wiersz(etykieta: string, wartoscHtml: string): string {
 
 const D = DYSTRYBUTOR;
 
-/** Skrót informacji o dystrybutorze — pełna wersja jest w załączonym PDF. */
-export const INFORMACJA_O_DYSTRYBUTORZE =
+/** Skrót informacji o dystrybutorze (bez odesłania do pełnej wersji). */
+export const INFORMACJA_O_DYSTRYBUTORZE_SKROT =
   `${D.nazwa}, ${D.adres}, jest agentem ubezpieczeniowym wpisanym do rejestru pośredników ubezpieczeniowych ` +
   `prowadzonego przez KNF pod numerem ${D.knf} (możesz to sprawdzić na ${D.rejestrKnf.replace("https://", "")}). ` +
   `KRS ${D.krs}, NIP ${D.nip}, REGON ${D.regon}. Kontakt: ${D.email}, tel. ${D.telefon}. ` +
-  `Reklamacje: ${D.reklamacje}. Pełna informacja o dystrybutorze — w załączniku.`;
+  `Reklamacje: ${D.reklamacje}.`;
 
-/** Klauzula informacyjna — zgodna z notą RODO Aura Expert (pełna nota w załączniku). */
-export const KLAUZULA_RODO =
+/** Skrót informacji o dystrybutorze — pełna wersja jest w załączonym PDF. */
+export const INFORMACJA_O_DYSTRYBUTORZE = `${INFORMACJA_O_DYSTRYBUTORZE_SKROT} Pełna informacja o dystrybutorze — w załączniku.`;
+
+/** Klauzula informacyjna — zgodna z notą RODO Aura Expert (bez odesłania do pełnej noty). */
+export const KLAUZULA_RODO_SKROT =
   `Administratorem Twoich danych osobowych jest ${D.nazwa} z siedzibą w Warszawie (${D.adres}). ` +
   `Dane podane we wniosku przetwarzamy na podstawie Twojej zgody oraz w celu podjęcia działań przed zawarciem umowy ubezpieczenia, ` +
   `czyli żeby przygotować ofertę; w tym zakresie możemy je przekazać zakładom ubezpieczeń. ` +
   `Masz prawo dostępu do danych, ich sprostowania, usunięcia, ograniczenia przetwarzania, przenoszenia, sprzeciwu, ` +
   `cofnięcia zgody w dowolnym momencie (bez wpływu na zgodność z prawem wcześniejszego przetwarzania) oraz skargi do Prezesa UODO. ` +
-  `Kontakt z Inspektorem Ochrony Danych: ${D.iod}. Pełna nota informacyjna RODO — w załączniku.`;
+  `Kontakt z Inspektorem Ochrony Danych: ${D.iod}.`;
+
+/** Klauzula informacyjna — zgodna z notą RODO Aura Expert (pełna nota w załączniku). */
+export const KLAUZULA_RODO = `${KLAUZULA_RODO_SKROT} Pełna nota informacyjna RODO — w załączniku.`;
 
 export function mailPotwierdzenieKlienta(d: DanePotwierdzenia): Wiadomosc {
   const temat = `Wniosek ${d.nrReferencyjny} przyjęty — ubezpieczenie majątkowe`;

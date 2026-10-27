@@ -433,6 +433,11 @@ function Historia({ wpisy, agenci }: { wpisy: WpisHistorii[]; agenci: Map<string
       }
       case "przydzial":
         return d.na ? `Przypisano: ${kto(String(d.na))}${d.przejecie ? " (przejęcie przy obsłudze)" : ""}` : "Zwrócono do puli";
+      case "email":
+        if (d.typ !== "przypomnienie_klienta") return "Wysłano e-mail";
+        return d.odbity
+          ? `Przypomnienie o dokończeniu wniosku NIE DOTARŁO — adres ${d.do ?? ""} odbity, prawdopodobnie błędny`
+          : `Wysłano klientowi przypomnienie o dokończeniu wniosku${d.do ? ` (${d.do})` : ""}`;
       default:
         return w.zdarzenie;
     }
