@@ -4,6 +4,10 @@ import { NextResponse, type NextRequest } from "next/server";
 /**
  * Odswieza sesje Supabase przy kazdym zadaniu do panelu.
  * Bez tego token wygasa w trakcie pracy i agent wypada z panelu w środku edycji.
+ *
+ * Next 16 nazywa to `proxy.ts`, ale proxy działa w runtime Node, a ten na Cloudflare
+ * OpenNext oznacza jako eksperymentalny i bez wsparcia. Zostajemy przy `middleware.ts`
+ * (runtime edge, w pełni wspierany) do czasu, aż OpenNext oficjalnie obsłuży proxy.
  */
 export async function middleware(request: NextRequest) {
   let odpowiedz = NextResponse.next({ request });

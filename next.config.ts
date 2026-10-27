@@ -18,7 +18,6 @@ const NAGLOWKI_BEZPIECZENSTWA = [
 ];
 
 const nextConfig: NextConfig = {
-  eslint: { ignoreDuringBuilds: true },
   async headers() {
     return [{ source: "/:path*", headers: NAGLOWKI_BEZPIECZENSTWA }];
   },

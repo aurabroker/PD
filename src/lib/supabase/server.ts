@@ -18,7 +18,7 @@ export async function supabaseServer() {
               ciasteczka.set(name, value, options),
             );
           } catch {
-            // Wywolanie z Server Componentu - ciasteczka odswiezy middleware.
+            // Wywolanie z Server Componentu - ciasteczka odswiezy middleware (src/middleware.ts).
           }
         },
       },
