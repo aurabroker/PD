@@ -30,7 +30,7 @@ const PRZERWA_MIEDZY_LINKAMI = 15 * 60 * 1000;
 export const ZASADY_PRZYPOMNIEN = { poDniachBezZmian: 2, drugiePoDniach: 7, najwyzej: 2 } as const;
 /**
  * Na jeden przebieg crona. Worker na planie darmowym ma limit 50 zapytań wychodzących
- * na wywołanie; jeden wniosek to do 4 (status poprzedniego maila, wysyłka, dziennik, historia).
+ * na wywołanie; jeden wniosek to 3 (wysyłka, dziennik, historia).
  */
 const MAKS_NA_PRZEBIEG = 8;
 
@@ -103,23 +103,6 @@ type MailWniosku = { id: number; wniosek_id: string; typ: string; do_kogo: strin
 
 export type DecyzjaPrzypomnienia = { nr: string; decyzja: "wyslane" | "do_wyslania" | "pominiete" | "blad"; powod?: string };
 
-/** Status maila w Resend („bounced” = adres nie istnieje). Null, gdy nie da się sprawdzić. */
-async function statusWResend(id: string): Promise<string | null> {
-  const klucz = process.env.RESEND_API_KEY;
-  if (!klucz) return null;
-  try {
-    const odp = await fetch(`https://api.resend.com/emails/${id}`, {
-      headers: { Authorization: `Bearer ${klucz}` },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!odp.ok) return null;
-    const j = (await odp.json()) as { last_event?: string };
-    return j.last_event ?? null;
-  } catch {
-    return null;
-  }
-}
-
 const cyfry = (v: string | null) => String(v ?? "").replace(/\D/g, "");
 
 /**
@@ -130,6 +113,11 @@ const cyfry = (v: string | null) => String(v ?? "").replace(/\D/g, "");
  * od 2 dni, bez linku wysłanego w tym czasie, z mniej niż dwoma przypomnieniami
  * (drugie najwcześniej 7 dni po pierwszym). Pomijamy adresy, na które poprzedni mail
  * wrócił jako niedoręczalny, oraz klientów, którzy złożyli już inny wniosek (ten sam e-mail albo NIP).
+ *
+ * Odbicia znamy tylko z dziennika (status „blad” z opisem bounce). Statusu w Resend nie
+ * sprawdzamy: klucz Workera ma uprawnienie „tylko wysyłka”, a odczyt maila kończył się
+ * 401 restricted_api_key. Na adres, który już raz odbił, Resend i tak nie wyśle drugi raz
+ * (lista blokad konta) — po stronie reputacji domeny nic nie tracimy.
  */
 export async function przebiegPrzypomnien(adresAplikacji: string, o: { proba?: boolean; teraz?: Date } = {}): Promise<DecyzjaPrzypomnienia[]> {
   const teraz = o.teraz ?? new Date();
@@ -197,19 +185,6 @@ export async function przebiegPrzypomnien(adresAplikacji: string, o: { proba?: b
     }
     if (wyslanych >= MAKS_NA_PRZEBIEG) {
       pomin("limit przebiegu — w następnym");
-      continue;
-    }
-
-    // Poprzedni mail na ten adres wrócił? Wtedy nie wysyłamy i zaznaczamy to w dzienniku i historii.
-    const poprzedni = jego.find((m) => m.do_kogo === adres && m.status === "wyslany" && m.resend_id);
-    if (poprzedni?.resend_id && (await statusWResend(poprzedni.resend_id)) === "bounced") {
-      if (!o.proba) {
-        await supabase.from("mienie_emaile")
-          .update({ status: "blad", blad: "Odbity przez serwer odbiorcy (bounce) — adres e-mail we wniosku prawdopodobnie błędny" })
-          .eq("id", poprzedni.id);
-        await zapiszHistorie(k.id, null, "email", { typ: poprzedni.typ, do: adres, resend_id: poprzedni.resend_id, odbity: true });
-      }
-      pomin("poprzedni mail odbity");
       continue;
     }
 

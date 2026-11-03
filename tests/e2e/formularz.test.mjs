@@ -320,7 +320,9 @@ await uruchom("T1 pelna sciezka: 2 lokalizacje, sprzet, szkody, polisa, zlozenie
   sprawdz(await page.getByRole("img", { name: "Twój podpis" }).isVisible(), "podgląd podpisu w podsumowaniu");
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
   await page.waitForURL(/\/zlozony$/, { timeout: 20000 });
-  sprawdz(await page.getByText("Dziękujemy").isVisible(), "strona potwierdzenia po złożeniu");
+  // Nagłówek, nie sam tekst: po nawigacji Next powtarza go w komunikacie dla czytników
+  // ekranu (route announcer) — getByText trafiał wtedy w dwa elementy, zależnie od tempa.
+  sprawdz(await page.getByRole("heading", { name: "Dziękujemy" }).isVisible(), "strona potwierdzenia po złożeniu");
   const potw = await page.locator("main").innerText();
   sprawdz(/(PD|PD\/EEI|EEI)\/\d{8}\/[A-HJ-NP-Z2-9]{6}/.test(potw), "numer referencyjny (PD/…) widoczny na potwierdzeniu", potw.slice(0, 200));
   sprawdzNumer(token, "T1");
