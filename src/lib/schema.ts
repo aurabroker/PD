@@ -346,25 +346,7 @@ export const wniosekDoZlozeniaSchema = wniosekSchema
       });
     }
 
-    // Zaznaczony zakres musi mieć sumę ubezpieczenia — inaczej nie ma czego wycenić.
-    const razem = (klucz: (typeof KLUCZE_SUM)[number]) =>
-      dane.lokalizacje.reduce((a, l) => a + (Number(l[klucz]) || 0), 0);
-    const ma = (z: (typeof ZAKRES)[number]) => (dane.zakres as readonly string[]).includes(z);
-    if (ma("Sprzęt elektroniczny (EEI)") && razem("suma_elektronika_it") <= 0) {
-      blad(["zakres"], "Zaznaczono sprzęt elektroniczny (EEI) — dodaj wykaz w kroku „Elektronika” albo sumę w lokalizacji");
-    }
-    if (ma("Sprzęt medyczny / aparatura") && razem("suma_sprzet_medyczny") <= 0) {
-      blad(["zakres"], "Zaznaczono sprzęt medyczny — dodaj wykaz w kroku „Sprzęt medyczny” albo sumę w lokalizacji");
-    }
-    if (ma("Szyby i inne przedmioty") && razem("suma_szyby") <= 0) {
-      blad(["zakres"], "Zaznaczono szyby — podaj sumę „Szyby i inne przedmioty” w lokalizacji");
-    }
-    if (
-      ma("Mienie od ognia i zdarzeń losowych") &&
-      razem("suma_budynek") + razem("suma_wyposazenie") + razem("suma_maszyny") + razem("suma_srodki_obrotowe") <= 0
-    ) {
-      blad(["zakres"], "Zaznaczono mienie od ognia — podaj sumę budynku, wyposażenia, maszyn albo środków obrotowych");
-    }
+    // Zaznaczony zakres bez sumy ubezpieczenia NIE blokuje złożenia — zakresBezSumy() niżej.
 
     if (!dane.miejscowosc_podpisu.trim()) blad(["miejscowosc_podpisu"], "Podaj miejscowość");
     else if (/\d/.test(dane.miejscowosc_podpisu)) {
@@ -419,6 +401,36 @@ export function sumaLokalizacji(lok: LokalizacjaRobocza): number {
 /** Laczna suma ubezpieczenia wniosku - odpowiednik sekcji 6 z arkusza. */
 export function sumaWniosku(dane: Pick<WniosekRoboczy, "lokalizacje">): number {
   return dane.lokalizacje.reduce((acc, lok) => acc + sumaLokalizacji(lok), 0);
+}
+
+/**
+ * Zaznaczony zakres bez sumy ubezpieczenia — do wyjaśnienia przez agenta.
+ *
+ * Do 11.2026 blokowało to złożenie wniosku. Klientka z kompletnym wnioskiem (dwie
+ * lokalizacje, zgody, podpis) dwa razy kliknęła „Złóż wniosek”, zatrzymała ją
+ * zerowa suma szyb — i odeszła. Wniosek z luką, którą agent wyjaśni telefonem,
+ * jest wart więcej niż wniosek niezłożony. Klient widzi to jako ostrzeżenie
+ * w ostatnim kroku, agent — w mailu o nowym wniosku i na karcie wniosku.
+ */
+export function zakresBezSumy(dane: Pick<WniosekRoboczy, "zakres" | "lokalizacje">): string[] {
+  const zakres = (dane.zakres ?? []) as readonly string[];
+  const razem = (...klucze: (typeof KLUCZE_SUM)[number][]) =>
+    (dane.lokalizacje ?? []).reduce((a, l) => a + klucze.reduce((b, k) => b + (Number(l?.[k]) || 0), 0), 0);
+  const uwagi: string[] = [];
+  if (zakres.includes("Mienie od ognia i zdarzeń losowych") &&
+      razem("suma_budynek", "suma_wyposazenie", "suma_maszyny", "suma_srodki_obrotowe") <= 0) {
+    uwagi.push("Zaznaczono mienie od ognia, ale suma budynku, wyposażenia, maszyn i środków obrotowych wynosi 0 zł.");
+  }
+  if (zakres.includes("Szyby i inne przedmioty") && razem("suma_szyby") <= 0) {
+    uwagi.push("Zaznaczono szyby, ale suma „Szyby i inne przedmioty” wynosi 0 zł.");
+  }
+  if (zakres.includes("Sprzęt elektroniczny (EEI)") && razem("suma_elektronika_it") <= 0) {
+    uwagi.push("Zaznaczono sprzęt elektroniczny (EEI), ale suma elektroniki wynosi 0 zł.");
+  }
+  if (zakres.includes("Sprzęt medyczny / aparatura") && razem("suma_sprzet_medyczny") <= 0) {
+    uwagi.push("Zaznaczono sprzęt medyczny, ale suma sprzętu medycznego wynosi 0 zł.");
+  }
+  return uwagi;
 }
 
 /**

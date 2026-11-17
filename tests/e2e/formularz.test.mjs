@@ -469,7 +469,8 @@ await uruchom("T4 próba złożenia pustego wniosku", async ({ page }) => {
   await page.waitForTimeout(2500);
   sprawdz(/\/wniosek\/[^/]+$/.test(page.url()), "nie przeszło do potwierdzenia");
   sprawdz(await page.getByText(/nie można złożyć/i).isVisible(), "komunikat, że wniosku nie można złożyć");
-  sprawdz(await page.getByText("Podaj nazwę firmy lub imię i nazwisko").isVisible(), "przeniesiono na krok z pierwszym błędem i pokazano komunikat przy polu");
+  // .first(): komunikat jest przy polu i (drugi raz) na liście braków przy przycisku.
+  sprawdz(await page.getByText("Podaj nazwę firmy lub imię i nazwisko").first().isVisible(), "przeniesiono na krok z pierwszym błędem i pokazano komunikat przy polu");
   const s = sql(`select status from mienie_wnioski where form_token='${token}'`);
   sprawdz(s === "roboczy", "DB: status nadal roboczy", s);
 }, browser);
@@ -556,7 +557,7 @@ await uruchom("T7 import Excela przez stronę i złożenie", async ({ page }) =>
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
   await page.getByText("Podaj rok budowy", { exact: false }).first().waitFor({ timeout: 15000 });
   sprawdz(await pole(page, "lokalizacje.1.rok_budowy").isVisible(), "brak roku budowy w lok. 2: przeniesiono na krok „Lokalizacja 2”");
-  sprawdz(await page.getByText("Wybierz pokrycie dachu").isVisible(), "komunikat o brakującym pokryciu dachu przy polu");
+  sprawdz(await page.getByText("Wybierz pokrycie dachu").first().isVisible(), "komunikat o brakującym pokryciu dachu przy polu");
   await wpisz(page, "lokalizacje.1.rok_budowy", "2012");
   await wybierz(page, "lokalizacje.1.pokrycie_dachu", "Strop żelbetowy (flat)");
   await krok(page, "Zakres, zgody i podpis");
@@ -590,7 +591,7 @@ await uruchom("T8 skrajne dane: minus, ogromne kwoty, długi tekst", async ({ pa
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
   await page.waitForTimeout(3000);
   sprawdz(/\/wniosek\/[^/]+$/.test(page.url()), "złożenie z ujemną kwotą zablokowane");
-  sprawdz(await page.getByText("Kwota nie może być ujemna").isVisible().catch(() => false), "po nieudanym złożeniu: przeniesiono do lokalizacji i komunikat widoczny przy polu");
+  sprawdz(await page.getByText("Kwota nie może być ujemna").first().isVisible().catch(() => false), "po nieudanym złożeniu: przeniesiono do lokalizacji i komunikat widoczny przy polu");
   const s8 = sql(`select status from mienie_wnioski where form_token='${token}'`);
   sprawdz(s8 === "roboczy", "DB: wniosek z ujemną kwotą nie został złożony", s8);
 }, browser);
@@ -1121,9 +1122,12 @@ await uruchom("T24 wniosek jak od klienta: bez NIP, EEI bez sumy, wykaz sprzętu
   sprawdz(await page.getByText("Podpis jest za krótki", { exact: false }).isVisible(), "kropka zamiast podpisu — „Podpis jest za krótki”");
   await page.getByRole("button", { name: "Anuluj" }).click();
   await page.getByRole("button", { name: "Złóż wniosek" }).click();
-  await page.getByText("Podaj NIP").waitFor({ timeout: 15000 });
+  await page.getByText("Podaj NIP").first().waitFor({ timeout: 15000 });
   sprawdz(/\/wniosek\/[^/]+$/.test(page.url()), "wniosek bez NIP nie przechodzi");
-  sprawdz(await page.getByText("Podaj NIP").isVisible(), "przeniesiono na „Dane firmy” z komunikatem „Podaj NIP”");
+  sprawdz(await page.getByText("Podaj NIP").first().isVisible(), "przeniesiono na „Dane firmy” z komunikatem „Podaj NIP”");
+  const braki24 = page.getByRole("list", { name: "Do uzupełnienia przed złożeniem" });
+  sprawdz(/Dane firmy: Podaj NIP/.test(await braki24.innerText()) && /Lokalizacja 1: Wybierz piętro/.test(await braki24.innerText()),
+    "przy przycisku „Złóż wniosek”: lista braków z nazwą kroku", (await braki24.innerText()).slice(0, 300));
   await krok(page, "Sprzęt medyczny");
   sprawdz((await page.locator("[name$='.nazwa'][name^='sprzet_medyczny']").count()) === 2, "pusty wiersz wykazu usunięty przy złożeniu");
   await krok(page, "Lokalizacja 1");
@@ -1131,9 +1135,11 @@ await uruchom("T24 wniosek jak od klienta: bez NIP, EEI bez sumy, wykaz sprzętu
     sprawdz(await page.getByText(t, { exact: false }).first().isVisible(), `lokalizacja: „${t}”`);
   }
   await krok(page, "Zakres, zgody i podpis");
-  sprawdz(await page.getByText(/Zaznaczono sprzęt elektroniczny \(EEI\)/).isVisible(), "EEI w zakresie bez sumy — komunikat przy zakresie");
-  sprawdz(await page.getByText("Wpisz samą miejscowość", { exact: false }).isVisible(), "data w polu miejscowości — komunikat");
-  sprawdz(await page.getByText("Podpisz wniosek w polu podpisu").isVisible(), "bez podpisu — komunikat przy polu podpisu");
+  sprawdz(/Zaznaczono sprzęt elektroniczny \(EEI\)/.test(await page.locator("[data-zakres-bez-sumy]").innerText()),
+    "EEI w zakresie bez sumy — ostrzeżenie przy zakresie (nie blokuje)");
+  sprawdz(!/EEI/.test(await braki24.innerText()), "EEI bez sumy nie jest na liście braków blokujących złożenie");
+  sprawdz(await page.getByText("Wpisz samą miejscowość", { exact: false }).first().isVisible(), "data w polu miejscowości — komunikat");
+  sprawdz(await page.getByText("Podpisz wniosek w polu podpisu").first().isVisible(), "bez podpisu — komunikat przy polu podpisu");
   const s24 = sql(`select status from mienie_wnioski where form_token='${token}'`);
   sprawdz(s24 === "roboczy", "DB: wniosek nadal roboczy", s24);
 }, browser);
@@ -1263,6 +1269,20 @@ await uruchom("T29 przejście do ostatniego kroku i nieudana próba złożenia z
   const proba = sql(`select h.szczegoly->>'pola' from mienie_historia h join mienie_wnioski w on w.id=h.wniosek_id
                      where w.form_token='${token}' and h.zdarzenie='proba_zlozenia'`);
   sprawdz(/zakres/.test(proba) && /podpis/.test(proba), "DB: historia „klient próbował złożyć” z listą braków", proba.slice(0, 200));
+  const komunikaty = sql(`select h.szczegoly->>'komunikaty' from mienie_historia h join mienie_wnioski w on w.id=h.wniosek_id
+                          where w.form_token='${token}' and h.zdarzenie='proba_zlozenia'`);
+  sprawdz(/Podpis: /.test(komunikaty) && /Zaznacz co najmniej jeden zakres/.test(komunikaty), "DB: historia z komunikatami po ludzku (dla agenta)", komunikaty.slice(-300));
+  sprawdz(await page.getByRole("list", { name: "Do uzupełnienia przed złożeniem" }).isVisible(), "lista braków widoczna przy przycisku");
+  const doZespolu = () => sql(`select count(*) from mienie_emaile e join mienie_wnioski w on w.id=e.wniosek_id
+                               where w.form_token='${token}' and e.typ='proba_zlozenia_zespol'`);
+  sprawdz(doZespolu() === "1", "zespół powiadomiony o nieudanej próbie złożenia (próba wysyłki w dzienniku)", doZespolu());
+  const adresaci = sql(`select e.do_kogo from mienie_emaile e join mienie_wnioski w on w.id=e.wniosek_id
+                        where w.form_token='${token}' and e.typ='proba_zlozenia_zespol'`);
+  sprawdz(adresaci.split(", ").includes(ADMIN.email), "powiadomienie o próbie trafia do aktywnego admina", adresaci);
+  await krok(page, "Zakres, zgody i podpis");
+  await page.getByRole("button", { name: "Złóż wniosek" }).click();
+  await page.waitForTimeout(2500);
+  sprawdz(doZespolu() === "1", "kolejna próba tego samego wniosku w ciągu doby — bez drugiego maila do zespołu", doZespolu());
 }, browser);
 
 await uruchom("T30 przypomnienia automatyczne: zasady, klucz crona, harmonogram Workera", async () => {
@@ -1310,9 +1330,22 @@ await uruchom("T30 przypomnienia automatyczne: zasady, klucz crona, harmonogram 
   const przedWysylka = sql(`select count(*) from mienie_emaile e join mienie_wnioski w on w.id=e.wniosek_id where w.nazwa_firmy='T30 a'`);
   sprawdz(przedWysylka === "0", "próba niczego nie wysłała", przedWysylka);
 
+  const zest = proba.zestawienie;
+  sprawdz(zest && [nrA, nrC, nrD, nrE, nrF, nrG, nrH].every((nr) => zest.nowe.includes(nr)) && zest.wyslano === false,
+    "zestawienie dla zespołu (próba): niedokończone wnioski z danymi, bez wysyłki", JSON.stringify(zest).slice(0, 300));
+  sprawdz(zest.nowe.includes(nrB), "zestawienie: B (zmiana wczoraj) też jest — wystarczą 3 h bez zmian", JSON.stringify(zest.nowe));
+  const swieze = sql(`select coalesce(string_agg(nr_referencyjny, ','), '') from mienie_wnioski where status='roboczy' and updated_at > now() - interval '3 hours'`)
+    .split(",").filter(Boolean);
+  sprawdz(swieze.length > 0 && !swieze.some((nr) => zest.nowe.includes(nr)), "zestawienie: wnioski zmieniane w ostatnich 3 h — jeszcze nie (klient może wypełniać)", `${swieze.length} świeżych`);
   const odp = await (await wolaj({ "x-cron-klucz": klucz })).json();
   const a = odp.decyzje.find((d) => d.nr === nrA);
   sprawdz(a?.decyzja === "blad" && /Brak konfiguracji/.test(a.powod ?? ""), "A: wysyłka podjęta (w replice brak klucza Resend)", JSON.stringify(a));
+  sprawdz(odp.zestawienie?.wyslano === false && /Brak konfiguracji/.test(odp.zestawienie?.blad ?? ""),
+    "zestawienie: wysyłka podjęta (w replice brak klucza Resend)", JSON.stringify(odp.zestawienie).slice(0, 200));
+  const zestDoKogo = sql(`select do_kogo from mienie_emaile where typ='zestawienie_szkicow' order by id desc limit 1`);
+  sprawdz(zestDoKogo.split(", ").includes(ADMIN.email), "zestawienie adresowane do zespołu (aktywni agenci)", zestDoKogo);
+  const zgloszone = sql(`select count(*) from mienie_historia where zdarzenie='zgloszony_zespolowi'`);
+  sprawdz(zgloszone === "0", "nieudana wysyłka zestawienia nie oznacza wniosków jako zgłoszonych (jutro będą znowu „nowe”)", zgloszone);
   const wpisA = () => sql(`select count(*) from mienie_emaile e join mienie_wnioski w on w.id=e.wniosek_id where w.nazwa_firmy='T30 a' and e.typ='przypomnienie_klienta'`);
   sprawdz(wpisA() === "1", "DB: próba przypomnienia w dzienniku maili", wpisA());
 
@@ -1320,6 +1353,33 @@ await uruchom("T30 przypomnienia automatyczne: zasady, klucz crona, harmonogram 
   const sched = await fetch(`${APP}/__scheduled?cron=${encodeURIComponent("5 8 * * *")}`);
   await new Promise((r) => setTimeout(r, 2500));
   sprawdz(sched.status === 200 && wpisA() === "2", "cron Workera uruchamia przebieg przypomnień", `HTTP ${sched.status}, wpisów: ${wpisA()}`);
+}, browser);
+
+await uruchom("T31 zakres bez sumy nie blokuje złożenia: ostrzeżenie dla klienta, uwaga dla agenta", async ({ page }) => {
+  const token = await nowyWniosek(page);
+  await wypelnijDaneFirmy(page, { nazwa: "Salon Szyby Bez Sumy", email: "szyby@salon-testowy.pl" });
+  await dalej(page);
+  await wypelnijLokalizacje(page, 0, { suma_wyposazenie: 40000 });
+  await krok(page, "Zakres, zgody i podpis");
+  for (const z of ["Mienie od ognia i zdarzeń losowych", "Szyby i inne przedmioty"]) {
+    await page.locator(`input[type=checkbox][value="${z}"]`).check();
+  }
+  const ostrzezenie = page.locator("[data-zakres-bez-sumy]");
+  sprawdz(await ostrzezenie.isVisible() && /Zaznaczono szyby/.test(await ostrzezenie.innerText()) && !/mienie od ognia/i.test(await ostrzezenie.innerText()),
+    "ostrzeżenie: szyby zaznaczone przy sumie 0 zł (ogień ma sumę — bez ostrzeżenia)", await ostrzezenie.innerText().catch(() => ""));
+  await wpisz(page, "miejscowosc_podpisu", "Kraków");
+  await zaznacz(page, "zgoda_prawdziwosc"); await zaznacz(page, "zgoda_rodo");
+  await podpisz(page);
+  await page.getByRole("button", { name: "Złóż wniosek" }).click();
+  await page.waitForURL(/\/zlozony$/, { timeout: 20000 });
+  const status = sql(`select status from mienie_wnioski where form_token='${token}'`);
+  sprawdz(status !== "roboczy", "DB: wniosek złożony mimo zaznaczonych szyb bez sumy", status);
+  const id = sql(`select id from mienie_wnioski where form_token='${token}'`);
+  await zaloguj(page, ADMIN.email, ADMIN.haslo);
+  await page.goto(`${APP}/admin/wnioski/${id}`);
+  const uwaga = page.locator("[data-do-wyjasnienia]");
+  sprawdz(await uwaga.isVisible() && /szyby/.test(await uwaga.innerText()), "panel: „Do wyjaśnienia z klientem” — szyby bez sumy",
+    await uwaga.innerText().catch(() => ""));
 }, browser);
 
 await browser.close();

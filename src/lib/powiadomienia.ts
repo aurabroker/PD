@@ -8,7 +8,7 @@ import { wyslijEmail, type Zalacznik } from "./email/wyslij";
 import { numerDoPliku } from "./numeracja";
 import { base64NaBajty, generujPdfWniosku } from "./pdf/wniosek-pdf";
 import { DOKUMENT_DYSTRYBUTOR, DOKUMENT_RODO } from "./pdf/zasoby.generated";
-import { sumaLokalizacji, sumaWniosku } from "./schema";
+import { sumaLokalizacji, sumaWniosku, zakresBezSumy } from "./schema";
 import { pobierzAgentow } from "./statystyki";
 import { pobierzWniosekPoId } from "./wnioski";
 import { pobierzPodpis } from "./podpis";
@@ -88,6 +88,7 @@ export async function powiadomOZlozeniu(wniosekId: string, adresAplikacji: strin
         liczbaLokalizacji: dane.lokalizacje.length,
         sumaLaczna: sumaWniosku(dane),
         zrodlo: meta.zrodlo,
+        doWyjasnienia: zakresBezSumy(dane),
         link: `${adresAplikacji}/admin/wnioski/${meta.id}`,
         logo: adresLogo(adresAplikacji),
       });

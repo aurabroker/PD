@@ -83,7 +83,13 @@ Zapis roboczy to nie złożenie — klienci często o tym nie wiedzieli. Dlatego
   pomijane adresy odbite (bounce) i klienci, którzy złożyli już inny wniosek.
   Administrator może podejrzeć decyzje bez wysyłki: `POST /api/cron/przypomnienia?proba=1`.
 - Nieudana próba złożenia (braki w polach) trafia do historii wniosku jako `proba_zlozenia` —
-  agent widzi, co zatrzymało klienta.
+  agent widzi, co zatrzymało klienta — a zespół dostaje od razu maila (najwyżej raz na dobę
+  na wniosek; `src/lib/szkice-zespol.ts`).
+- **Zestawienie dla zespołu** — w tym samym przebiegu crona: nowe niedokończone wnioski
+  (bez zmian od 3 h, z danymi firmy albo kontaktu, z ostatnich 30 dni) z kontaktem i postępem.
+  Każdy wniosek raz (wpis `zgloszony_zespolowi` w historii, dopiero po udanej wysyłce).
+- Zaznaczony zakres bez sumy (np. szyby przy sumie 0 zł) **nie blokuje** złożenia — klient
+  widzi ostrzeżenie, agent „Do wyjaśnienia z klientem” w mailu i na karcie (`zakresBezSumy`).
 
 ### Dostęp
 

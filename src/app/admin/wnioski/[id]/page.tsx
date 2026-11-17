@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { pobierzWniosekPoId } from "@/lib/wnioski";
-import { kontrolaSpojnosci, sumaLokalizacji, sumaWniosku } from "@/lib/schema";
+import { kontrolaSpojnosci, sumaLokalizacji, sumaWniosku, zakresBezSumy } from "@/lib/schema";
 import { zl } from "@/lib/format";
 import { POZYCJE_SUM, STATUS_ETYKIETY } from "@/lib/slowniki";
 import { jestBrak, tytulLokalizacji } from "@/lib/porzadkowanie";
@@ -29,6 +29,7 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
   const poId = new Map(agenci.map((a) => [a.user_id, a]));
   const kontrola = kontrolaSpojnosci(dane);
   const rozbieznosci = kontrola.filter((k) => !k.zgodnyMedyczny || !k.zgodnyEei);
+  const doWyjasnienia = zakresBezSumy(dane);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
@@ -59,6 +60,14 @@ export default async function SzczegolyWniosku({ params }: { params: Promise<{ i
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_20rem]">
         <div className="space-y-6">
+          {doWyjasnienia.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4" data-do-wyjasnienia="">
+              <h2 className="text-sm font-semibold text-amber-900">Do wyjaśnienia z klientem</h2>
+              <ul className="mt-2 space-y-1 text-sm text-amber-900">
+                {doWyjasnienia.map((u) => <li key={u}>{u}</li>)}
+              </ul>
+            </div>
+          )}
           {rozbieznosci.length > 0 && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
               <h2 className="text-sm font-semibold text-amber-900">
@@ -444,9 +453,11 @@ function Historia({ wpisy, agenci }: { wpisy: WpisHistorii[]; agenci: Map<string
             : `${co} — wysłano na ${d.do ?? "adres z wniosku"}`;
         }
       case "proba_zlozenia": {
-        const pola = Array.isArray(d.pola) ? (d.pola as string[]) : [];
-        return `Klient próbował złożyć wniosek — zatrzymały go braki (${pola.length}): ${pola.slice(0, 8).join(", ")}${pola.length > 8 ? "…" : ""}`;
+        const braki = Array.isArray(d.komunikaty) ? (d.komunikaty as string[]) : Array.isArray(d.pola) ? (d.pola as string[]) : [];
+        return `Próba złożenia wniosku zatrzymana przez braki (${braki.length}): ${braki.slice(0, 8).join("; ")}${braki.length > 8 ? "…" : ""}`;
       }
+      case "zgloszony_zespolowi":
+        return "Zgłoszono zespołowi w zestawieniu niedokończonych wniosków";
       default:
         return w.zdarzenie;
     }

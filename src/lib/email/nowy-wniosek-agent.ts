@@ -15,7 +15,10 @@ export function mailNowyWniosekAgent(d: {
   zrodlo: string;
   link: string;
   logo: string;
+  /** Zaznaczony zakres bez sumy (zakresBezSumy) — klient złożył, agent dopyta. */
+  doWyjasnienia?: string[];
 }): Wiadomosc {
+  const doWyjasnienia = d.doWyjasnienia ?? [];
   const zrodlo = { web: "formularz online", excel: "import pliku Excel", agent: "wniosek założony przez agenta" }[d.zrodlo] ?? d.zrodlo;
   const temat = `Nowy wniosek ${d.nrReferencyjny} — ${d.nazwaFirmy}`;
   const wiersz = (etykieta: string, wartosc: string) => `<tr>
@@ -39,6 +42,7 @@ export function mailNowyWniosekAgent(d: {
         ${wiersz("Lokalizacje", String(d.liczbaLokalizacji))}
         ${wiersz("Łączna suma", `<strong>${h(zl(d.sumaLaczna))}</strong>`)}
         ${wiersz("Źródło", h(zrodlo))}
+        ${doWyjasnienia.length ? wiersz("Do wyjaśnienia", `<span style="color:#92400e;">${doWyjasnienia.map(h).join("<br>")}</span>`) : ""}
       </table>
     </td></tr>
     <tr><td style="padding:16px 28px 28px;">
@@ -61,6 +65,7 @@ export function mailNowyWniosekAgent(d: {
     `Zakres: ${d.zakres.join("; ") || "—"}`,
     `Lokalizacje: ${d.liczbaLokalizacji}, łączna suma: ${zl(d.sumaLaczna)}`,
     `Źródło: ${zrodlo}`,
+    ...(doWyjasnienia.length ? [`Do wyjaśnienia z klientem:`, ...doWyjasnienia.map((u) => `- ${u}`)] : []),
     ``,
     `Otwórz w panelu: ${d.link}`,
     `Kopia PDF w załączniku.`,

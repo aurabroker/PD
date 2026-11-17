@@ -36,13 +36,14 @@ Chromium (Playwright) → Worker (wrangler dev) → proxy /rest/v1 → PostgREST
 | T21 | statystyki: liczby zgodne z bazą, wszystkie okresy |
 | T22 | baner na stronie „Dziękujemy”: gdy grafika się nie wczyta, karta tekstowa z tym samym linkiem |
 | T23 | strona główna: logo Aura Expert w nagłówku, favicon, sekcja „Nasze serwisy” (4 serwisy, Beauty Polisa „Wkrótce”) |
-| T24 | wniosek jak od klienta: bez NIP, EEI bez sumy, data w polu miejscowości — złożenie zablokowane z komunikatami; suma sprzętu z wykazu (tylko do odczytu), pusty wiersz wykazu usunięty |
+| T24 | wniosek jak od klienta: bez NIP, EEI bez sumy, data w polu miejscowości — złożenie zablokowane, lista braków z nazwą kroku przy przycisku „Złóż wniosek”; EEI bez sumy tylko jako ostrzeżenie; suma sprzętu z wykazu (tylko do odczytu), pusty wiersz wykazu usunięty |
 | T25 | wykaz sprzętu do .xlsx z panelu: 401 bez logowania, arkusze medyczny/EEI, kwoty jako liczby, sumy |
 | T26 | panel bez logowania: żądanie nawigacji (RSC), które pomija layout `/admin`, nie zwraca listy, statystyk ani szczegółów wniosku — każda strona sama wymaga sesji |
 | T27 | nagłówki bezpieczeństwa na stronie, logowaniu i API: zakaz osadzania w cudzej ramce (`X-Frame-Options`, `frame-ancestors`), HSTS, nosniff, Referrer-Policy, Permissions-Policy |
 | T28 | „wniosek niezłożony” wprost: pasek statusu z numerem kroku, ostatni krok „Zakres, zgody i podpis”, podpowiedź literówki w domenie e-maila, „Zapisz i dokończ później” → panel z linkiem i wysyłka linku (limit 3 na dobę), bez e-maila — link do skopiowania |
-| T29 | przycisk „Dalej: zakres, zgody i podpis →”, informacja o mailu po złożeniu, nieudana próba złożenia zapisana w historii z listą braków |
-| T30 | przypomnienia automatyczne: zasady (2 dni bez zmian, najwyżej 2, drugie po 7 dniach, bez odbitych adresów, bez klientów, którzy złożyli inny wniosek, bez szkiców sprzed września, bez literówek), klucz crona (401 bez/z błędnym), tryb próby, harmonogram Workera (`/__scheduled`) |
+| T29 | przycisk „Dalej: zakres, zgody i podpis →”, informacja o mailu po złożeniu, nieudana próba złożenia: historia z komunikatami, lista braków przy przycisku, mail do zespołu (raz na dobę na wniosek) |
+| T30 | przypomnienia automatyczne: zasady (2 dni bez zmian, najwyżej 2, drugie po 7 dniach, bez odbitych adresów, bez klientów, którzy złożyli inny wniosek, bez szkiców sprzed września, bez literówek), klucz crona (401 bez/z błędnym), tryb próby, harmonogram Workera (`/__scheduled`); zestawienie niedokończonych wniosków dla zespołu (3 h bez zmian, oznaczenie dopiero po udanej wysyłce) |
+| T31 | zaznaczony zakres bez sumy (szyby) nie blokuje złożenia: ostrzeżenie dla klienta w ostatnim kroku, „Do wyjaśnienia z klientem” na karcie wniosku w panelu |
 
 Korpus złośliwych plików do T14 generuje `tests/e2e/generuj-zlosliwe.mjs`
 (bez zależności, sam z szablonu i wypełnionego wniosku). Można go uruchomić

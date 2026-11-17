@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { biezacyAdmin, wniosekZTokenu } from "@/lib/autoryzacja";
 import { zweryfikujTurnstile } from "@/lib/turnstile";
@@ -20,6 +21,7 @@ import { adresAplikacji } from "@/lib/adres-aplikacji";
 import { STATUS } from "@/lib/slowniki";
 import { wyslijLinkDoWniosku, type WynikLinku } from "@/lib/przypomnienia";
 import { zapiszHistorie } from "@/lib/historia";
+import { opisBledu, powiadomZespolOProbie } from "@/lib/szkice-zespol";
 
 export type WynikAkcji =
   | { ok: true; komunikat?: string }
@@ -153,7 +155,12 @@ export async function akcjaZlozWniosek(token: string, dane: unknown, podpis?: un
     // Bez tego „porzucony” wniosek i wniosek odbity od walidacji wyglądały w panelu tak samo.
     const dostep = await wniosekZTokenu(token);
     if (dostep?.wniosek?.status === "roboczy") {
-      await zapiszHistorie(dostep.wniosek.id, null, "proba_zlozenia", { pola: Object.keys(bledy).slice(0, 40) });
+      const id: string = dostep.wniosek.id;
+      const komunikaty = Object.entries(bledy).map(([sciezka, k]) => opisBledu(sciezka, k)).slice(0, 40);
+      await zapiszHistorie(id, null, "proba_zlozenia", { pola: Object.keys(bledy).slice(0, 40), komunikaty });
+      // Zespół dostaje maila od razu (klient chciał złożyć) — już po odpowiedzi dla klienta.
+      const baza = await adresAplikacji();
+      after(() => powiadomZespolOProbie(id, komunikaty, baza));
     }
     return {
       ok: false,

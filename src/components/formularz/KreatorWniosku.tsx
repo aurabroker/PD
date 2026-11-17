@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { akcjaZapiszIWyslijLink, akcjaZapiszRoboczy, akcjaZlozWniosek } from "@/app/actions/wniosek";
 import type { WynikLinku } from "@/lib/przypomnienia";
 import { sprawdzAdresEmail } from "@/lib/email-adres";
-import { pustaLokalizacja, sumaWniosku, wniosekSchema } from "@/lib/schema";
+import { pustaLokalizacja, sumaWniosku, wniosekSchema, zakresBezSumy } from "@/lib/schema";
 import type { Wniosek } from "@/lib/schema";
 import {
   FORMA_PRAWNA,
@@ -51,6 +51,10 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
   // Wynik „Zapisz i dokończ później”: czy link poszedł mailem i dokąd.
   const [naPozniej, setNaPozniej] = useState<WynikLinku | null>(null);
   const [zapisNaPozniej, setZapisNaPozniej] = useState(false);
+  // Lista braków po nieudanym złożeniu — pokazywana przy przycisku „Złóż wniosek”.
+  // Sam komunikat przy polu nie wystarczał: klient był na dole strony, przy przycisku,
+  // a komunikat o zakresie stał na górze kroku. Widział tylko „uzupełnij brakujące pola”.
+  const [brakiZlozenia, setBrakiZlozenia] = useState<{ krok: number; komunikat: string }[]>([]);
 
   const lokalizacje = metody.watch("lokalizacje") ?? [];
   const liczbaLokalizacji = Math.max(1, lokalizacje.length);
@@ -188,6 +192,7 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
   async function zloz() {
     setSkladanie(true);
     setBladZapisu("");
+    setBrakiZlozenia([]);
 
     // Autozapis nie moze wystartowac w trakcie skladania ani po nim.
     if (timer.current) clearTimeout(timer.current);
@@ -237,7 +242,11 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
             : "firma";
           return Math.max(0, kroki.findIndex((k) => k.klucz === klucz));
         };
-        setKrok(Math.min(...Object.keys(wynik.bledyPol).map(krokBledu)));
+        const braki = Object.entries(wynik.bledyPol)
+          .map(([sciezka, komunikat]) => ({ krok: krokBledu(sciezka), komunikat }))
+          .sort((a, b) => a.krok - b.krok);
+        setBrakiZlozenia(braki);
+        setKrok(braki[0]?.krok ?? krok);
       }
     }
   }
@@ -309,7 +318,27 @@ export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: 
         </div>
 
         {bladZapisu && (
-          <p className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">{bladZapisu}</p>
+          <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700" role="alert">
+            <p>{bladZapisu}</p>
+            {brakiZlozenia.length > 0 && (
+              <ul className="mt-2 space-y-1.5" aria-label="Do uzupełnienia przed złożeniem">
+                {brakiZlozenia.slice(0, 12).map((b, i) => (
+                  <li key={i} className="flex flex-wrap items-baseline gap-x-2">
+                    <span><strong>{kroki[b.krok]?.etykieta}:</strong> {b.komunikat}</span>
+                    <button type="button" className="text-xs font-medium underline"
+                      onClick={() => {
+                        setKrok(b.krok);
+                        // Po zmianie kroku — do pierwszego komunikatu błędu w tym kroku.
+                        setTimeout(() => document.querySelector(".komunikat-bledu")?.scrollIntoView({ block: "center", behavior: "smooth" }), 50);
+                      }}>
+                      Pokaż
+                    </button>
+                  </li>
+                ))}
+                {brakiZlozenia.length > 12 && <li>…i {brakiZlozenia.length - 12} więcej.</li>}
+              </ul>
+            )}
+          </div>
         )}
 
         {naPozniej && (
@@ -645,6 +674,7 @@ function KrokPodsumowanie({
   const posiadaPolise = watch("posiada_polise");
 
   const suma = sumaWniosku({ lokalizacje: dane.lokalizacje ?? [] });
+  const bezSumy = zakresBezSumy({ zakres: dane.zakres ?? [], lokalizacje: dane.lokalizacje ?? [] });
 
   return (
     <div className="space-y-6">
@@ -671,6 +701,17 @@ function KrokPodsumowanie({
           })}
         </div>
         {bledy.zakres?.message && <p className="komunikat-bledu">{bledy.zakres.message}</p>}
+        {bezSumy.length > 0 && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" data-zakres-bez-sumy="">
+            <ul className="space-y-1">
+              {bezSumy.map((u) => <li key={u}>{u}</li>)}
+            </ul>
+            <p className="mt-2">
+              Uzupełnij sumę w kroku lokalizacji albo odznacz tę pozycję. Możesz też złożyć wniosek tak,
+              jak jest — agent dopyta o brakujące kwoty.
+            </p>
+          </div>
+        )}
       </Sekcja>
 
       <Sekcja tytul="Sekcja 6 — łączna suma ubezpieczenia">
