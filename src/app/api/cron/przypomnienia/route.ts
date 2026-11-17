@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { wymaganyAdmin } from "@/lib/autoryzacja";
 import { kluczCrona, rowne } from "@/lib/cron";
+import { adresAplikacji, sprawdzAdresAplikacji } from "@/lib/adres-aplikacji";
 import { przebiegPrzypomnien } from "@/lib/przypomnienia";
 import { zestawienieSzkicow, type WynikZestawienia } from "@/lib/szkice-zespol";
 
@@ -26,8 +27,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ blad: "Brak uprawnień." }, { status: 401 });
   }
 
+  // Adres do linków z nagłówków (harmonogram ustawia x-forwarded-host w cloudflare-worker.mjs),
+  // nie z request.url — dla wewnętrznego żądania bez Host był to „https://undefined”.
+  let adres: string;
   try {
-    const decyzje = await przebiegPrzypomnien(url.origin, { proba });
+    adres = sprawdzAdresAplikacji(await adresAplikacji());
+  } catch (e) {
+    console.error("[przypomnienia]", e);
+    return NextResponse.json({ blad: e instanceof Error ? e.message : "Brak adresu aplikacji" }, { status: 500 });
+  }
+
+  try {
+    const decyzje = await przebiegPrzypomnien(adres, { proba });
     const podsumowanie = {
       proba,
       wyslane: decyzje.filter((d) => d.decyzja === "wyslane").length,
@@ -38,13 +49,13 @@ export async function POST(request: Request) {
     // Osobny try: błąd zestawienia nie może zgubić wyniku przypomnień (już wysłanych).
     let zestawienie: WynikZestawienia | { blad: string };
     try {
-      zestawienie = await zestawienieSzkicow(url.origin, { proba });
+      zestawienie = await zestawienieSzkicow(adres, { proba });
     } catch (e) {
       console.error("[przypomnienia] zestawienie:", e);
       zestawienie = { blad: e instanceof Error ? e.message : "Błąd zestawienia" };
     }
     console.log("[przypomnienia]", JSON.stringify({ ...podsumowanie, zestawienie }));
-    return NextResponse.json({ ...podsumowanie, decyzje, zestawienie }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ ...podsumowanie, adres, decyzje, zestawienie }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     console.error("[przypomnienia] przebieg:", e);
     return NextResponse.json({ blad: e instanceof Error ? e.message : "Błąd przebiegu" }, { status: 500 });

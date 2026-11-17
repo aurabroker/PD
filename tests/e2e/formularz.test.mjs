@@ -1319,6 +1319,7 @@ await uruchom("T30 przypomnienia automatyczne: zasady, klucz crona, harmonogram 
   const proba = await odpProba.json();
   const decyzja = (nr) => proba.decyzje.find((d) => d.nr === nr);
   sprawdz(odpProba.status === 200 && proba.proba === true, "próba z kluczem: 200, bez wysyłki", JSON.stringify(proba).slice(0, 200));
+  sprawdz(proba.adres === new URL(APP).origin, "linki w mailach z crona: adres aplikacji z nagłówków żądania (nie „undefined”)", proba.adres);
   sprawdz(decyzja(nrA)?.decyzja === "do_wyslania", "A: 3 dni bez zmian → przypomnienie", JSON.stringify(decyzja(nrA)));
   sprawdz(!decyzja(nrB), "B: zmiana wczoraj → jeszcze nie");
   sprawdz(decyzja(nrC)?.decyzja === "pominiete" && /dwa/.test(decyzja(nrC).powod), "C: po dwóch przypomnieniach — koniec", JSON.stringify(decyzja(nrC)));
@@ -1350,9 +1351,11 @@ await uruchom("T30 przypomnienia automatyczne: zasady, klucz crona, harmonogram 
   sprawdz(wpisA() === "1", "DB: próba przypomnienia w dzienniku maili", wpisA());
 
   // Harmonogram Workera (scheduled) — ten sam endpoint, wywołany przez cloudflare-worker.mjs.
+  // Wewnętrzne żądanie nie ma nagłówka Host: bez x-forwarded-host z workera adres wychodził
+  // „https://undefined”, a strażnik adresu zatrzymałby przebieg — wpisu by nie było.
   const sched = await fetch(`${APP}/__scheduled?cron=${encodeURIComponent("5 8 * * *")}`);
   await new Promise((r) => setTimeout(r, 2500));
-  sprawdz(sched.status === 200 && wpisA() === "2", "cron Workera uruchamia przebieg przypomnień", `HTTP ${sched.status}, wpisów: ${wpisA()}`);
+  sprawdz(sched.status === 200 && wpisA() === "2", "cron Workera uruchamia przebieg przypomnień (z poprawnym adresem do linków)", `HTTP ${sched.status}, wpisów: ${wpisA()}`);
 }, browser);
 
 await uruchom("T31 zakres bez sumy nie blokuje złożenia: ostrzeżenie dla klienta, uwaga dla agenta", async ({ page }) => {

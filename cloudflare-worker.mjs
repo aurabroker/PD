@@ -4,6 +4,11 @@
 // `fetch` to bez zmian handler OpenNext. `scheduled` (cron z wrangler.jsonc) wywołuje
 // wewnętrznie POST /api/cron/przypomnienia — bez wychodzenia do sieci — z kluczem
 // liczonym tak samo jak w src/lib/cron.ts.
+//
+// Wewnętrzne żądanie nie ma nagłówka Host, a z niego aplikacja buduje linki w mailach
+// (src/lib/adres-aplikacji.ts). Przypomnienia szły z linkami „https://undefined/…” —
+// dlatego adres podajemy jawnie. Potrzebny jest `host`: OpenNext po middleware nadpisuje
+// x-forwarded-host wartością nagłówka host.
 import aplikacja from "./.open-next/worker.js";
 
 const ADRES_APLIKACJI = "https://wnioski.auraexpert.pl";
@@ -24,7 +29,12 @@ export default {
     }
     const zadanie = new Request(`${ADRES_APLIKACJI}/api/cron/przypomnienia`, {
       method: "POST",
-      headers: { "x-cron-klucz": await kluczCrona(sekret) },
+      headers: {
+        "x-cron-klucz": await kluczCrona(sekret),
+        host: new URL(ADRES_APLIKACJI).host,
+        "x-forwarded-host": new URL(ADRES_APLIKACJI).host,
+        "x-forwarded-proto": "https",
+      },
     });
     const odp = await aplikacja.fetch(zadanie, env, ctx);
     const tresc = await odp.text();

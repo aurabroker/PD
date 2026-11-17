@@ -5,6 +5,7 @@ import { adresLogo } from "./email/marka";
 import { mailProbaZlozenia, mailZestawienieSzkicow, type SzkicDlaZespolu } from "./email/szkice-zespol";
 import { pobierzAgentow } from "./statystyki";
 import { TYP_LINK, TYP_PRZYPOMNIENIE } from "./przypomnienia";
+import { sprawdzAdresAplikacji } from "./adres-aplikacji";
 
 /**
  * Zespół dowiaduje się o wnioskach, których klient nie złożył (11.2026: przez trzy
@@ -112,7 +113,7 @@ async function szczegoly(wiersze: Wiersz[], baza: string): Promise<SzkicDlaZespo
  */
 export async function powiadomZespolOProbie(wniosekId: string, komunikaty: string[], adresAplikacji: string): Promise<void> {
   try {
-    const baza = adresAplikacji.replace(/\/$/, "");
+    const baza = sprawdzAdresAplikacji(adresAplikacji);
     const supabase = supabaseAdmin();
     const { count } = await supabase
       .from("mienie_emaile")
@@ -143,7 +144,7 @@ export type WynikZestawienia = { nowe: string[]; wczesniej: number; wyslano: boo
 /** Codzienne zestawienie niedokończonych wniosków dla zespołu. `proba` — bez wysyłki i bez oznaczania. */
 export async function zestawienieSzkicow(adresAplikacji: string, o: { proba?: boolean; teraz?: Date } = {}): Promise<WynikZestawienia> {
   const teraz = o.teraz ?? new Date();
-  const baza = adresAplikacji.replace(/\/$/, "");
+  const baza = sprawdzAdresAplikacji(adresAplikacji);
   const supabase = supabaseAdmin();
 
   const { data, error } = await supabase

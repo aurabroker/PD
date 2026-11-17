@@ -5,6 +5,7 @@ import { adresLogo } from "./email/marka";
 import { mailPrzypomnienieKlienta } from "./email/przypomnienie-klienta";
 import { sprawdzAdresEmail } from "./email-adres";
 import { zapiszHistorie } from "./historia";
+import { sprawdzAdresAplikacji } from "./adres-aplikacji";
 
 /**
  * Maile do klientów z wnioskiem niezłożonym:
@@ -42,7 +43,7 @@ export type WynikLinku =
 
 /** Link do wniosku na adres z wniosku. Nie rzuca — wynik mówi, co się stało. */
 export async function wyslijLinkDoWniosku(token: string, adresAplikacji: string): Promise<WynikLinku> {
-  const baza = adresAplikacji.replace(/\/$/, "");
+  const baza = sprawdzAdresAplikacji(adresAplikacji);
   const link = `${baza}/wniosek/${token}`;
   const supabase = supabaseAdmin();
 
@@ -121,7 +122,7 @@ const cyfry = (v: string | null) => String(v ?? "").replace(/\D/g, "");
  */
 export async function przebiegPrzypomnien(adresAplikacji: string, o: { proba?: boolean; teraz?: Date } = {}): Promise<DecyzjaPrzypomnienia[]> {
   const teraz = o.teraz ?? new Date();
-  const baza = adresAplikacji.replace(/\/$/, "");
+  const baza = sprawdzAdresAplikacji(adresAplikacji);
   const supabase = supabaseAdmin();
   const decyzje: DecyzjaPrzypomnienia[] = [];
 
