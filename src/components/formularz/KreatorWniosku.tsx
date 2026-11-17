@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { FormProvider, useFieldArray, useForm, useFormContext } from "react-hook-form";
+import { FormProvider, useFieldArray, useForm, useFormContext, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { akcjaZapiszIWyslijLink, akcjaZapiszRoboczy, akcjaZlozWniosek } from "@/app/actions/wniosek";
 import type { WynikLinku } from "@/lib/przypomnienia";
@@ -36,7 +36,9 @@ type Props = {
 export default function KreatorWniosku({ token, wartosciPoczatkowe, zImportu }: Props) {
   const metody = useForm<Wniosek>({
     defaultValues: wartosciPoczatkowe,
-    resolver: zodResolver(wniosekSchema),
+    // zod 4: resolver jest typowany wejściem schematu (pola z .default() opcjonalne),
+    // formularz trzyma pełny Wniosek — wartości po walidacji i tak mają ten kształt.
+    resolver: zodResolver(wniosekSchema) as unknown as Resolver<Wniosek>,
     mode: "onBlur",
   });
 

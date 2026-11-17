@@ -44,7 +44,7 @@ function odswiez(id: string) {
   revalidatePath("/admin/agenci");
 }
 
-const kwota = z.coerce.number({ invalid_type_error: "Podaj kwotę" }).positive("Kwota musi być większa od zera").max(100_000_000);
+const kwota = z.coerce.number({ error: "Podaj kwotę" }).positive("Kwota musi być większa od zera").max(100_000_000);
 const data = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Podaj datę");
 const tekst = (min: number, komunikat: string) => z.string().trim().min(min, komunikat).max(200);
 
@@ -64,12 +64,12 @@ const zmianaStatusu = z.discriminatedUnion("status", [
   }),
   z.object({
     status: z.literal("rezygnacja"),
-    rezygnacja_powod: z.enum(POWODY_REZYGNACJI, { errorMap: () => ({ message: "Wybierz powód rezygnacji" }) }),
+    rezygnacja_powod: z.enum(POWODY_REZYGNACJI, { error: "Wybierz powód rezygnacji" }),
   }),
   ...STATUS.filter((s) => !["wyceniony", "polisa", "rezygnacja"].includes(s)).map((s) =>
     z.object({ status: z.literal(s) }),
   ),
-] as unknown as [z.ZodDiscriminatedUnionOption<"status">, ...z.ZodDiscriminatedUnionOption<"status">[]]);
+] as unknown as [z.ZodObject, ...z.ZodObject[]]);
 
 export async function akcjaZmienStatus(id: string, dane: unknown): Promise<WynikPanelu> {
   const dostep = await dostepDoWniosku(id);

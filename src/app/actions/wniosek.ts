@@ -52,10 +52,10 @@ function dzisWarszawa(): string {
 }
 
 /** Bledy walidacji zod -> mapa "sciezka pola" => komunikat, czytana przez formularz. */
-function bledyPol(issues: { path: (string | number)[]; message: string }[]) {
+function bledyPol(issues: { path: PropertyKey[]; message: string }[]) {
   const mapa: Record<string, string> = {};
   for (const issue of issues) {
-    const klucz = issue.path.join(".");
+    const klucz = issue.path.map(String).join(".");
     // Kilka komunikatów na jednym polu (np. zakres bez sum) — pokazujemy wszystkie.
     if (!mapa[klucz]) mapa[klucz] = issue.message;
     else if (!mapa[klucz].includes(issue.message)) mapa[klucz] += ` · ${issue.message}`;

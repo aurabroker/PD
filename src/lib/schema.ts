@@ -64,7 +64,7 @@ function zbuduj(tryb: Tryb) {
   /** Kwota w pelnych zlotych. Puste pole i 0 sa rownowazne. */
   const kwota = pelny
     ? z.coerce
-        .number({ invalid_type_error: "Podaj kwotę liczbą" })
+        .number({ error: "Podaj kwotę liczbą" })
         .min(0, "Kwota nie może być ujemna")
         .max(1_000_000_000, "Kwota wygląda na zawyżoną")
         .default(0)
@@ -287,17 +287,13 @@ export type Szkoda = z.infer<typeof szkodaSchema>;
  */
 export const wniosekDoZlozeniaSchema = wniosekSchema
   .extend({
-    zgoda_prawdziwosc: z.literal(true, {
-      errorMap: () => ({ message: "Potwierdź prawdziwość podanych informacji" }),
-    }),
-    zgoda_rodo: z.literal(true, {
-      errorMap: () => ({ message: "Zgoda na przetwarzanie danych jest wymagana" }),
-    }),
+    zgoda_prawdziwosc: z.literal(true, { error: "Potwierdź prawdziwość podanych informacji" }),
+    zgoda_rodo: z.literal(true, { error: "Zgoda na przetwarzanie danych jest wymagana" }),
     zakres: z.array(z.enum(ZAKRES)).min(1, "Zaznacz co najmniej jeden zakres ubezpieczenia"),
   })
   .superRefine((dane, ctx) => {
     const blad = (path: (string | number)[], message: string) =>
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path, message });
+      ctx.addIssue({ code: "custom", path, message });
     const rokTeraz = new Date().getFullYear();
     const zlyRok = (v: string, od: number) => {
       const t = v.trim();
@@ -355,7 +351,7 @@ export const wniosekDoZlozeniaSchema = wniosekSchema
 
     if (sumaWniosku(dane) <= 0) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["lokalizacje"],
         message: "Podaj sumy ubezpieczenia przynajmniej dla jednej lokalizacji",
       });
@@ -363,7 +359,7 @@ export const wniosekDoZlozeniaSchema = wniosekSchema
 
     if (!dane.brak_szkod && dane.szkody.length === 0) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["szkody"],
         message: "Zaznaczono szkody w ostatnich 5 latach — wypełnij tabelę szkód",
       });
